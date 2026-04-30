@@ -1,23 +1,13 @@
+# src/main.py
 import flet as ft
+from playbook.db.database import initialize_db
 
 
 def main(page: ft.Page):
     page.title = "PlayBook"
-    page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-
-    welcome_text = ft.Text(
-        "Добро пожаловать в PlayBook!",
-        size=24,
-        weight=ft.FontWeight.BOLD,
-    )
-    page.add(welcome_text)
-
-    def button_clicked(e):
-        welcome_text.value = "Отличноб Flet работает!"
-        page.update()
-
-    page.add(ft.ElevatedButton("Нажми меня", on_click=button_clicked))
+    # ... остальной код
 
 
-ft.app(target=main)
+if __name__ == "__main__":
+    initialize_db()
+    ft.app(target=main)

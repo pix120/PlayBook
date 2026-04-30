@@ -30,8 +30,8 @@ class Book(BaseModel):
     last_played: Optional[datetime] = None
     date_added: datetime = Field(default_factory=datetime.now)
 
-    model_config = {
+    """ model_config = {
         "json_encoders": {
             datetime: lambda v: v.isoformat(),
         }
-    }
+    }"""
