@@ -1,0 +1,8 @@
+{
+    "library_paths": [
+        "~/Аудиокниги"
+    ],
+    "database_path": "data/playbook.db",
+    "theme": "dark",
+    "sleep_timer_default": 30
+}
