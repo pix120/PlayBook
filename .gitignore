@@ -1,0 +1,22 @@
+# Виртуальное окружение
+.venv/
+venv/
+ENV/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Файлы IDE
+.vscode/
+.idea/
+
+# Артефакты тестов
+.pytest_cache/
+
+# Конфигурация пользователя
+config/user_config.json
+
+# Замок зависимостей (опционально, но я рекомендую не коммитить)
+requirements-lock.txt
