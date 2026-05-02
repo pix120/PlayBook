@@ -15,9 +15,8 @@ from .widgets import BookGridCard, BookListItem
 class LibraryPage:
     def __init__(self, app: PlayBookApp):
         self.app = app
-        self._filter = None  # None означает "Все"
+        self._filter = None
         self._view_mode = "grid"
-        self._books = get_all_books()
 
         self.book_container = ft.Container(expand=True)
         self.filter_buttons = self._create_filter_buttons()
@@ -26,9 +25,10 @@ class LibraryPage:
             tooltip="Переключить вид",
             on_click=self._toggle_view_mode,
         )
+        self.filter_row = None
 
     def build(self) -> ft.Column:
-        filter_row = ft.Row(
+        self.filter_row = ft.Row(
             controls=[
                 ft.Text("Статус:", weight=ft.FontWeight.BOLD),
                 *self.filter_buttons,
@@ -38,11 +38,11 @@ class LibraryPage:
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
-        self._render_books()
+        self._render_books()  # здесь обновление страницы не требуется
 
         return ft.Column(
             controls=[
-                filter_row,
+                self.filter_row,
                 ft.Divider(),
                 self.book_container,
             ],
@@ -58,33 +58,29 @@ class LibraryPage:
         ]
         buttons = []
         for label, status in filters:
+            is_active = status == self._filter
             btn = ft.ElevatedButton(
                 content=ft.Text(label),
                 on_click=lambda e, s=status: self._set_filter(s),
                 style=ft.ButtonStyle(
-                    color={
-                        ft.ControlState.DEFAULT: ft.Colors.ON_SURFACE,
-                        ft.ControlState.SELECTED: ft.Colors.ON_PRIMARY,
-                    },
-                    bgcolor={
-                        ft.ControlState.DEFAULT: ft.Colors.SURFACE,
-                        ft.ControlState.SELECTED: ft.Colors.PRIMARY,
-                    },
+                    color=ft.Colors.ON_PRIMARY if is_active else ft.Colors.ON_SURFACE,
+                    bgcolor=ft.Colors.PRIMARY if is_active else ft.Colors.SURFACE,
                 ),
-                data=status,
             )
-            if self._filter == status:
-                btn.selected = True
             buttons.append(btn)
         return buttons
 
     def _set_filter(self, status: BookStatus | None):
         self._filter = status
-        # Обновим выделение всех кнопок
-        for btn in self.filter_buttons:
-            btn.selected = btn.data == status
+        self.filter_buttons = self._create_filter_buttons()
+        self.filter_row.controls = [
+            ft.Text("Статус:", weight=ft.FontWeight.BOLD),
+            *self.filter_buttons,
+            self.view_toggle_button,
+        ]
+        self.filter_row.update()
         self._render_books()
-        self.app.page.update()
+        self.app.page.update()  # обновим страницу целиком
 
     def _toggle_view_mode(self, e):
         self._view_mode = "list" if self._view_mode == "grid" else "grid"
@@ -95,6 +91,7 @@ class LibraryPage:
         self.app.page.update()
 
     def _render_books(self):
+        """Заполняет book_container.content книгами, НЕ обновляя страницу."""
         filtered_books = self._get_filtered_books()
         if self._view_mode == "grid":
             content = self._build_grid(filtered_books)
@@ -128,7 +125,10 @@ class LibraryPage:
         )
 
     def _book_selected(self, book):
-        self.app.switch_to_section("player")
+        player_page = self.app.pages.get("player")
+        if player_page:
+            player_page.add_to_playlist(book)
+            self.app.switch_to_section("player")
 
     def refresh_data(self):
         self._render_books()
