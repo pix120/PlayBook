@@ -74,6 +74,17 @@ class PlayBookApp:
         # Добавляем на страницу
         self.page.add(self.root_view)
         self.page.update()
+        self.page.app = self
+        self.page.app = self
+
+        def on_window_event(e):
+            if e.data == "close":
+                player_page = self.pages.get("player")
+                if player_page and player_page.current_book:
+                    player_page._save_progress()
+            self.page.window_destroy()
+
+        self.page.on_window_event = on_window_event
 
     def _on_nav_change(self, e):
         """Переключение раздела."""

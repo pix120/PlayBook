@@ -30,8 +30,27 @@ class Book(BaseModel):
     last_played: Optional[datetime] = None
     date_added: datetime = Field(default_factory=datetime.now)
 
-    """ model_config = {
-        "json_encoders": {
-            datetime: lambda v: v.isoformat(),
-        }
-    }"""
+    @property
+    def progress_percent(self) -> float:
+        if self.duration > 0:
+            return min(100.0, max(0.0, (self.progress / self.duration) * 100.0))
+        return 0.0
+
+    @property
+    def duration_str(self) -> str:
+        return self._format_time(self.duration)
+
+    @property
+    def progress_str(self) -> str:
+        return self._format_time(self.progress)
+
+    @staticmethod
+    def _format_time(seconds: float) -> str:
+        if seconds < 0:
+            seconds = 0
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        return f"{minutes:02d}:{secs:02d}"

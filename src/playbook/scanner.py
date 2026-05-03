@@ -1,33 +1,23 @@
+from __future__ import annotations
+
 import os
 from pathlib import Path
-from typing import List, Optional, Iterator, Tuple
+from typing import List, Iterator, Optional
 import mutagen
-from mutagen.mp3 import MP3
-from mutagen.mp4 import MP4
-from mutagen.flac import FLAC
-from mutagen.oggvorbis import OggVorbis
-from mutagen.oggopus import OggOpus
-from mutagen.wave import WAVE
 
 from .models.book import Book, BookStatus
 from .db.database import get_book_by_path, add_book, update_book, get_all_books
+from .cover_manager import save_cover
 
 AUDIO_EXTENSIONS = {".mp3", ".m4b", ".m4a", ".ogg", ".flac", ".wav", ".opus"}
 
 
 def find_audio_files(paths: List[Path]) -> Iterator[Path]:
-    """
-    генератор который рекурсивно обходит каждый путь из списка и выдает путь к аудиофайлу.
-    """
-
+    """Генератор, рекурсивно обходящий папки и возвращающий пути аудиофайлов."""
     for root_path in paths:
         if not root_path.exists():
             continue
-        for (
-            dirpath,
-            dirnames,
-            filenames,
-        ) in os.walk(root_path):
+        for dirpath, dirnames, filenames in os.walk(root_path):
             for filename in filenames:
                 file_path = Path(dirpath) / filename
                 if file_path.suffix.lower() in AUDIO_EXTENSIONS:
@@ -35,14 +25,7 @@ def find_audio_files(paths: List[Path]) -> Iterator[Path]:
 
 
 def extract_metadata(file_path: Path) -> dict:
-    """
-    Извлекает метаданные аудиокниги из файла.
-    Возвращает словарь с полями:
-        title: str
-        author: str
-        duration: float (в секундах)
-        cover_data: bytes или None
-    """
+    """Извлекает метаданные аудиокниги. Возвращает словарь с ключами title, author, duration, cover_data."""
     try:
         audio = mutagen.File(str(file_path))
     except Exception:
@@ -68,52 +51,38 @@ def extract_metadata(file_path: Path) -> dict:
     title = None
     author = "Неизвестный автор"
 
-    if isinstance(audio, MP3):
-        # MP3 теги: ID3
+    if isinstance(audio, mutagen.mp3.MP3):
         if audio.tags:
             title = str(audio.tags.get("TIT2", ""))
             author = str(audio.tags.get("TPE1", author))
-    elif isinstance(audio, MP4):
-        # M4B/M4A теги: MP4
+    elif isinstance(audio, mutagen.mp4.MP4):
         if audio.tags:
             title = str(audio.tags.get("\xa9nam", [""])[0])
             author = str(audio.tags.get("\xa9ART", [author])[0])
-    elif isinstance(audio, FLAC):
+    elif isinstance(audio, mutagen.flac.FLAC):
         if audio.tags:
             title = str(audio.tags.get("title", [""])[0])
             author = str(audio.tags.get("artist", [author])[0])
-    elif isinstance(audio, (OggVorbis, OggOpus)):
+    elif isinstance(audio, (mutagen.oggvorbis.OggVorbis, mutagen.oggopus.OggOpus)):
         if audio.tags:
             title = str(audio.tags.get("title", [""])[0])
             author = str(audio.tags.get("artist", [author])[0])
-    elif isinstance(audio, WAVE):
-        # WAV обычно без тегов
-        pass
 
-    # Если название пустое или отсутствует, используем имя файла
     if not title:
         title = file_path.stem
 
-    # Обложка
     cover_data = None
-    if isinstance(audio, MP3) and audio.tags:
+    if isinstance(audio, mutagen.mp3.MP3) and audio.tags:
         for tag in audio.tags.values():
             if tag.FrameID == "APIC":
                 cover_data = tag.data
                 break
-    elif isinstance(audio, MP4) and audio.tags:
+    elif isinstance(audio, mutagen.mp4.MP4) and audio.tags:
         if "covr" in audio.tags:
             cover_data = bytes(audio.tags["covr"][0])
-    elif isinstance(audio, FLAC) and audio.pictures:
+    elif isinstance(audio, mutagen.flac.FLAC) and audio.pictures:
         cover_data = audio.pictures[0].data
-    elif isinstance(audio, (OggVorbis, OggOpus)):
-        # У Ogg обложка может лежать в metadata_block_picture
-        if "metadata_block_picture" in audio.tags:
-            import base64
-
-            raw = base64.b64decode(audio.tags["metadata_block_picture"][0])
-            # Парсить можно, но для простоты пока пропустим
-            pass
+    # Ogg обложки пока не обрабатываем для простоты
 
     return {
         "title": title,
@@ -126,16 +95,9 @@ def extract_metadata(file_path: Path) -> dict:
 def scan_and_update_library(root_paths: List[Path]) -> Iterator[dict]:
     """
     Сканирует папки, обновляет БД.
-    Возвращает генератор событий с состоянием процесса:
-        {"type": "progress", "current": int, "total": int, "file": str}
-        {"type": "book_updated", "book": Book}
-        {"type": "book_added", "book": Book}
-        {"type": "finished", "added": int, "updated": int}
+    Генератор событий: progress, book_updated, book_added, finished.
     """
-    # Получаем все существующие в БД книги для быстрой проверки дубликатов
     existing_books = {book.file_path: book for book in get_all_books()}
-
-    # Собираем список всех найденных файлов, чтобы иметь общее количество
     audio_files = list(find_audio_files(root_paths))
     total_files = len(audio_files)
     added_count = 0
@@ -150,15 +112,21 @@ def scan_and_update_library(root_paths: List[Path]) -> Iterator[dict]:
         }
 
         meta = extract_metadata(file_path)
-        # Проверяем, есть ли уже книга с таким путём
-        if file_path_str := str(file_path) in existing_books:
+
+        cover_path = None
+        if meta["cover_data"]:
+            try:
+                saved_cover_path = save_cover(str(file_path), meta["cover_data"])
+                cover_path = str(saved_cover_path)
+            except Exception as exc:
+                print(f"Не удалось сохранить обложку для {file_path}: {exc}")
+
+        if str(file_path) in existing_books:
             existing_book = existing_books[str(file_path)]
-            # Обновляем метаданные, но сохраняем пользовательские поля
             existing_book.title = meta["title"]
             existing_book.author = meta["author"]
             existing_book.duration = meta["duration"]
-            if meta["cover_data"]:
-                existing_book.cover_path = "embedded"  # заглушка
+            existing_book.cover_path = cover_path
             update_book(existing_book)
             updated_count += 1
             yield {"type": "book_updated", "book": existing_book}
@@ -168,13 +136,12 @@ def scan_and_update_library(root_paths: List[Path]) -> Iterator[dict]:
                 author=meta["author"],
                 duration=meta["duration"],
                 file_path=str(file_path),
-                cover_path="embedded" if meta["cover_data"] else None,
+                cover_path=cover_path,
                 status=BookStatus.NEW,
             )
             added_book = add_book(new_book)
             added_count += 1
             yield {"type": "book_added", "book": added_book}
-            # Добавляем в кэш, чтобы не считать дубликатами в рамках одного сканирования
             existing_books[str(file_path)] = added_book
 
     yield {
