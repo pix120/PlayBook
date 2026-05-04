@@ -1,6 +1,8 @@
 from __future__ import annotations
-from typing import List, Optional
+
+import sqlite3
 from datetime import datetime
+from typing import List, Optional
 
 from .connection import get_connection
 from ..models.book import Book, BookStatus
@@ -81,7 +83,10 @@ def add_book(book: Book) -> Book:
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO books (title, author, duration, file_path, cover_path, status, progress, last_played, date_added)
+            INSERT INTO books (
+                title, author, duration, file_path, cover_path,
+                status, progress, last_played, date_added
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import List, Iterator, Optional
+from typing import Iterator, List
 import mutagen
 
 from .models.book import Book, BookStatus
-from .db.database import get_book_by_path, add_book, update_book, get_all_books
+from .db.database import add_book, get_all_books, update_book
 from .cover_manager import save_cover
 
 AUDIO_EXTENSIONS = {".mp3", ".m4b", ".m4a", ".ogg", ".flac", ".wav", ".opus"}
@@ -25,7 +25,7 @@ def find_audio_files(paths: List[Path]) -> Iterator[Path]:
 
 
 def extract_metadata(file_path: Path) -> dict:
-    """Извлекает метаданные аудиокниги. Возвращает словарь с ключами title, author, duration, cover_data."""
+    """Extract metadata: title, author, duration, cover_data."""
     try:
         audio = mutagen.File(str(file_path))
     except Exception:

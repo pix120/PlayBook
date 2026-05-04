@@ -1,7 +1,4 @@
-import json
-from pathlib import Path
-import pytest
-from playbook.config import get_config, save_config, _config, USER_CONFIG_PATH
+from playbook.config import get_config, save_config
 from playbook.models.config import AppConfig
 
 

@@ -14,7 +14,7 @@ def set_db_path(path: Path) -> None:
 
 
 def override_db_path_for_testing(path: Optional[Path]) -> None:
-    """Только для тестов: установить путь, который будет использоваться get_connection."""
+    """Test helper: set DB path used by get_connection."""
     global _override_db_path
     _override_db_path = path
 

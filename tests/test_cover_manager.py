@@ -1,6 +1,6 @@
 import tempfile
 from pathlib import Path
-from playbook.cover_manager import save_cover, get_cover_path_or_none, COVERS_DIR
+from playbook.cover_manager import get_cover_path_or_none, save_cover
 
 
 def test_save_cover_creates_file(monkeypatch, tmp_path):

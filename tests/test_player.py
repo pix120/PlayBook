@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, patch
-from playbook.models.book import Book, BookStatus
+from unittest.mock import MagicMock
+
+from playbook.models.book import Book
 from playbook.ui.player_page import PlayerPage
 import flet as ft
 
@@ -67,4 +68,4 @@ def test_on_stop_resets_position(player_page):
     player_page.audio.pause.assert_called_once()
     player_page.audio.seek.assert_called_with(0)
     assert player_page.progress_slider.value == 0.0
-    assert player_page.play_button.icon == ft.Icons.PLAY_ARROW
+    assert player_page.play_button.icon == ft.icons.PLAY_ARROW
