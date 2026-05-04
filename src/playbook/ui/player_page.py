@@ -311,6 +311,9 @@ class PlayerPage:
     # ------ Audio callbacks ------
     def load_book(self, book: Book):
         self.current_book = book
+        if not Path(book.file_path).exists():
+            self._handle_missing_audio_file(book)
+            return
         if self.audio is not None:
             self._stop_audio_and_save_progress()
             self.app.page.overlay.remove(self.audio)
@@ -330,6 +333,16 @@ class PlayerPage:
         self._set_controls_enabled(False)
         self.play_button.icon = ft.icons.PLAY_ARROW
         self._notify_mini_player()
+
+    def _handle_missing_audio_file(self, book: Book):
+        self.audio = None
+        self.is_playing = False
+        self.play_button.icon = ft.icons.PLAY_ARROW
+        self._set_controls_enabled(False)
+        self.app.page.show_snack_bar(
+            ft.SnackBar(content=ft.Text(f"Audio file not found: {book.file_path}"))
+        )
+        self.app.page.update()
 
     def _update_ui_for_book(self):
         if not self.current_book:

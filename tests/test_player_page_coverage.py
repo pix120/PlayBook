@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,13 +12,20 @@ from playbook.models.book import Book
 from playbook.ui.player_page import PlayerPage
 
 
+def _existing_audio_path() -> str:
+    path = Path(tempfile.gettempdir()) / "playbook_test_audio.mp3"
+    if not path.exists():
+        path.write_bytes(b"ID3")
+    return str(path)
+
+
 def _book(**kwargs):
     defaults = dict(
         id=1,
         title="T",
         author="A",
         duration=100.0,
-        file_path="/tmp/x.mp3",
+        file_path=_existing_audio_path(),
         progress=0.0,
     )
     defaults.update(kwargs)

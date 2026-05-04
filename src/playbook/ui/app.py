@@ -82,9 +82,16 @@ class PlayBookApp:
                 player = self.pages.get("player")
                 if player and player.current_book:
                     player._save_progress()
-                page.window_destroy()
+                if getattr(page, "window", None) is not None:
+                    page.window_destroy()
 
-        page.on_window_event = on_window_event
+        # In some runtimes/sessions, page.window may exist while the internal
+        # native window handle is still unavailable. Binding can raise there.
+        try:
+            page.on_window_event = on_window_event
+        except AttributeError:
+            # Non-window session or window backend not ready; continue safely.
+            pass
 
     def _on_nav_change(self, e):
         index = e.control.selected_index
