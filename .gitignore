@@ -181,3 +181,4 @@ data/covers/
 config/user_config.json
 requirements-lock.txt
 requirements-dev.txt
+pyproject.toml
