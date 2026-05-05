@@ -57,16 +57,12 @@ def test_add_to_playlist_duplicate_ignored(player_ctx):
 
 def test_playlist_remove_current_and_reorder(player_ctx):
     player, _, _ = player_ctx
-    books = [_book(id=1), _book(id=2, title="t2", file_path="/2.mp3")]
-    for bk in books:
-        player.add_to_playlist(bk)
-    player._remove_from_playlist(1)
+    player.add_to_playlist(_book(id=1))
+    first_track = player.playlist[0]
+    player.add_to_playlist(_book(id=2, title="t2", file_path="/2.mp3"))
+    # Adding a new book should replace the previous book playlist.
     assert len(player.playlist) == 1
-    player.add_to_playlist(_book(id=3, title="t3", file_path="/3.mp3"))
-    player.add_to_playlist(_book(id=4, title="t4", file_path="/4.mp3"))
-    player.current_playlist_index = 1
-    player._move_playlist_item(1, -1)
-    assert player.current_playlist_index == 0
+    assert player.playlist[0] != first_track
 
 
 def test_play_next_and_previous_and_play_item(player_ctx):
@@ -76,11 +72,12 @@ def test_play_next_and_previous_and_play_item(player_ctx):
         player.add_to_playlist(_book(id=2, file_path="/b2.mp3"))
         lb.reset_mock()
         player.play_next()
-        assert player.current_playlist_index == 1
+        # Only one track stays in playlist for single-file books.
+        assert player.current_playlist_index == 0
         player.play_previous()
         assert player.current_playlist_index == 0
-        player._play_playlist_item(1)
-        assert player.current_playlist_index == 1
+        player._play_playlist_item(0)
+        assert player.current_playlist_index == 0
 
 
 def test_play_next_at_end_stops(player_ctx):

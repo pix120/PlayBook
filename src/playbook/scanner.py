@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+from collections import defaultdict
 from pathlib import Path
-from typing import Iterator, List
+from typing import Iterator, List, Dict
+
 import mutagen
 
 from .models.book import Book, BookStatus
-from .db.database import add_book, get_all_books, update_book
+from .db.database import add_book, get_all_books, update_book, delete_book
 from .cover_manager import save_cover
 
 AUDIO_EXTENSIONS = {".mp3", ".m4b", ".m4a", ".ogg", ".flac", ".wav", ".opus"}
@@ -53,8 +55,11 @@ def extract_metadata(file_path: Path) -> dict:
 
     if isinstance(audio, mutagen.mp3.MP3):
         if audio.tags:
-            title = str(audio.tags.get("TIT2", ""))
-            author = str(audio.tags.get("TPE1", author))
+            # MP3 теги возвращают объекты, преобразуем в строку аккуратно
+            title_tag = audio.tags.get("TIT2")
+            title = str(title_tag.text[0]) if title_tag else ""
+            author_tag = audio.tags.get("TPE1")
+            author = str(author_tag.text[0]) if author_tag else author
     elif isinstance(audio, mutagen.mp4.MP4):
         if audio.tags:
             title = str(audio.tags.get("\xa9nam", [""])[0])
@@ -95,54 +100,89 @@ def extract_metadata(file_path: Path) -> dict:
 def scan_and_update_library(root_paths: List[Path]) -> Iterator[dict]:
     """
     Сканирует папки, обновляет БД.
-    Генератор событий: progress, book_updated, book_added, finished.
+    Генератор событий: progress, book_updated, book_added, book_deleted, finished.
+    Логика: каждая папка, содержащая аудиофайлы, становится одной книгой.
     """
-    existing_books = {book.file_path: book for book in get_all_books()}
+    # 1. Удаляем старые записи, у которых file_path указывает на файл (старая схема)
+    books_before = get_all_books()
+    for book in books_before:
+        if Path(book.file_path).is_file() or not Path(book.file_path).exists():
+            delete_book(book.id)
+            yield {"type": "book_deleted", "book": book}
+
+    # 2. Получаем всё аудио и группируем по папкам
     audio_files = list(find_audio_files(root_paths))
-    total_files = len(audio_files)
+    grouped: Dict[Path, List[Path]] = defaultdict(list)
+    for f in audio_files:
+        grouped[f.parent].append(f)
+
+    folder_items = sorted(grouped.items(), key=lambda item: str(item[0]).lower())
+    total_folders = len(folder_items)
+
+    # 3. Загружаем текущие книги для обновления (уже без старых файловых)
+    existing_books = {book.file_path: book for book in get_all_books()}
     added_count = 0
     updated_count = 0
 
-    for idx, file_path in enumerate(audio_files, 1):
+    for idx, (folder_path, files_in_folder) in enumerate(folder_items, 1):
+        sorted_files = sorted(files_in_folder, key=lambda p: p.name.lower())
+        representative_file = sorted_files[0]
         yield {
             "type": "progress",
             "current": idx,
-            "total": total_files,
-            "file": str(file_path),
+            "total": total_folders,
+            "file": str(folder_path),
         }
 
-        meta = extract_metadata(file_path)
+        # Суммируем длительность всех файлов в папке
+        total_duration = 0.0
+        for chapter_file in sorted_files:
+            meta = extract_metadata(chapter_file)
+            total_duration += meta["duration"]
 
+        first_meta = extract_metadata(representative_file)
         cover_path = None
-        if meta["cover_data"]:
+        if first_meta["cover_data"]:
             try:
-                saved_cover_path = save_cover(str(file_path), meta["cover_data"])
+                saved_cover_path = save_cover(
+                    str(representative_file), first_meta["cover_data"]
+                )
                 cover_path = str(saved_cover_path)
             except Exception as exc:
-                print(f"Не удалось сохранить обложку для {file_path}: {exc}")
+                print(f"Не удалось сохранить обложку для {representative_file}: {exc}")
 
-        if str(file_path) in existing_books:
-            existing_book = existing_books[str(file_path)]
-            existing_book.title = meta["title"]
-            existing_book.author = meta["author"]
-            existing_book.duration = meta["duration"]
+        book_key = str(folder_path)  # теперь file_path = путь к папке
+
+        if book_key in existing_books:
+            existing_book = existing_books[book_key]
+            existing_book.title = folder_path.name
+            existing_book.author = first_meta["author"]
+            existing_book.duration = total_duration
             existing_book.cover_path = cover_path
             update_book(existing_book)
             updated_count += 1
             yield {"type": "book_updated", "book": existing_book}
         else:
             new_book = Book(
-                title=meta["title"],
-                author=meta["author"],
-                duration=meta["duration"],
-                file_path=str(file_path),
+                title=folder_path.name,
+                author=first_meta["author"],
+                duration=total_duration,
+                file_path=book_key,
                 cover_path=cover_path,
                 status=BookStatus.NEW,
             )
             added_book = add_book(new_book)
             added_count += 1
             yield {"type": "book_added", "book": added_book}
-            existing_books[str(file_path)] = added_book
+            existing_books[book_key] = added_book
+
+    # 4. Очистка: удаляем книги, чьи папки больше не существуют в сканируемых путях
+    current_folders = {str(folder) for folder, _ in folder_items}
+    all_books_in_db = get_all_books()
+    for book in all_books_in_db:
+        if book.file_path not in current_folders:
+            delete_book(book.id)
+            yield {"type": "book_deleted", "book": book}
 
     yield {
         "type": "finished",

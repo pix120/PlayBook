@@ -69,12 +69,13 @@ def test_scan_adds_new_books():
         events = list(scan_and_update_library([Path("/fake")]))
 
     assert events[-1]["type"] == "finished"
-    assert events[-1]["added"] == 2
+    assert events[-1]["added"] == 1
     assert events[-1]["updated"] == 0
 
     books = get_all_books()
-    assert len(books) == 2
-    assert {b.title for b in books} == {"Book1", "Book2"}
+    assert len(books) == 1
+    assert books[0].title == "fake"
+    assert books[0].duration == 200.0
 
 
 def test_scan_updates_existing_book_with_cover():
@@ -83,7 +84,7 @@ def test_scan_updates_existing_book_with_cover():
             title="Old Title",
             author="Old Author",
             duration=50.0,
-            file_path="/fake/existing.mp3",
+            file_path="/fake",
             status=BookStatus.STARTED,
             progress=10.0,
         )
@@ -109,7 +110,7 @@ def test_scan_updates_existing_book_with_cover():
     assert events[-1]["updated"] == 1
 
     book = get_all_books()[0]
-    assert book.title == "New Title"
+    assert book.title == "fake"
     assert book.author == "New Author"
     assert book.duration == 200.0
     assert book.status == BookStatus.STARTED
@@ -124,7 +125,7 @@ def test_scan_save_cover_failure_still_updates(monkeypatch, tmp_path):
             title="T",
             author="A",
             duration=1.0,
-            file_path=str(tmp_path / "t.mp3"),
+            file_path=str(tmp_path),
             status=BookStatus.NEW,
         )
     )
@@ -144,7 +145,7 @@ def test_scan_save_cover_failure_still_updates(monkeypatch, tmp_path):
         list(scan_and_update_library([tmp_path]))
 
     book = get_all_books()[0]
-    assert book.title == "T2"
+    assert book.title == tmp_path.name
     assert book.cover_path is None
 
 

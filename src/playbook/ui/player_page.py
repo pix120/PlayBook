@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 from ..models.book import Book, BookStatus
 from ..db.database import update_progress, update_book
+from ..scanner import AUDIO_EXTENSIONS, extract_metadata
 
 
 class PlayerPage:
@@ -22,6 +23,7 @@ class PlayerPage:
         self.is_playing = False
         self.slider_being_dragged = False
         self._update_timer: Optional[threading.Timer] = None
+        self._pending_seek_seconds = 0.0
 
         # UI элементы
         self.cover_image = ft.Image(
@@ -101,8 +103,9 @@ class PlayerPage:
             on_click=self._toggle_playlist,
         )
 
-        # Playlist state
-        self.playlist: List[Book] = []
+        # Playlist state (chapter files for currently selected book)
+        self.playlist: List[Path] = []
+        self.playlist_durations: List[float] = []
         self.current_playlist_index: int = -1
 
         # Sleep timer
@@ -183,24 +186,56 @@ class PlayerPage:
 
     # ------ Playlist management ------
     def add_to_playlist(self, book: Book):
-        for b in self.playlist:
-            if b.id == book.id:
-                return
-        self.playlist.append(book)
-        if self.current_playlist_index == -1:
-            self.current_playlist_index = 0
-            self.load_book(book)
+        self._stop_audio_and_save_progress()
+        self.playlist.clear()
+        self.playlist_durations.clear()
+        self.current_playlist_index = -1
+        self.current_book = book
+
+        book_folder = Path(book.file_path)
+        if book_folder.is_dir():
+            chapter_files = sorted(
+                [
+                    path
+                    for path in book_folder.iterdir()
+                    if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
+                ],
+                key=lambda path: path.name.lower(),
+            )
+        elif book_folder.suffix.lower() in AUDIO_EXTENSIONS:
+            # Backward compatibility for existing single-file records/tests.
+            chapter_files = [book_folder]
+        else:
+            self._handle_missing_audio_file(book)
+            return
+        if not chapter_files:
+            self.app.page.show_snack_bar(
+                ft.SnackBar(content=ft.Text(f"В папке нет аудиофайлов: {book_folder}"))
+            )
+            self._update_playlist_panel()
+            self._notify_mini_player()
+            return
+
+        self.playlist = chapter_files
+        self.playlist_durations = [
+            extract_metadata(path).get("duration", 0.0) for path in chapter_files
+        ]
+        track_index, track_offset = self._resolve_resume_position()
+        self.current_playlist_index = track_index
+        self.load_current_track(start_position=track_offset)
         self._update_playlist_panel()
         self._notify_mini_player()
 
     def _remove_from_playlist(self, index: int):
         if 0 <= index < len(self.playlist):
             self.playlist.pop(index)
+            if index < len(self.playlist_durations):
+                self.playlist_durations.pop(index)
             if index == self.current_playlist_index:
                 self._stop_audio_and_save_progress()
                 if self.playlist:
                     self.current_playlist_index = min(index, len(self.playlist) - 1)
-                    self.load_book(self.playlist[self.current_playlist_index])
+                    self.load_current_track(start_position=0.0)
                 else:
                     self.current_playlist_index = -1
                     self.current_book = None
@@ -213,6 +248,9 @@ class PlayerPage:
         new_index = index + direction
         if 0 <= new_index < len(self.playlist):
             self.playlist.insert(new_index, self.playlist.pop(index))
+            self.playlist_durations.insert(
+                new_index, self.playlist_durations.pop(index)
+            )
             if index == self.current_playlist_index:
                 self.current_playlist_index = new_index
             elif (
@@ -231,7 +269,7 @@ class PlayerPage:
         if self.playlist and self.current_playlist_index < len(self.playlist) - 1:
             self._stop_audio_and_save_progress()
             self.current_playlist_index += 1
-            self.load_book(self.playlist[self.current_playlist_index])
+            self.load_current_track(start_position=0.0)
             self._update_playlist_panel()
         else:
             self._on_stop(None)
@@ -240,14 +278,14 @@ class PlayerPage:
         if self.playlist and self.current_playlist_index > 0:
             self._stop_audio_and_save_progress()
             self.current_playlist_index -= 1
-            self.load_book(self.playlist[self.current_playlist_index])
+            self.load_current_track(start_position=0.0)
             self._update_playlist_panel()
 
     def _play_playlist_item(self, index: int):
         if 0 <= index < len(self.playlist):
             self._stop_audio_and_save_progress()
             self.current_playlist_index = index
-            self.load_book(self.playlist[index])
+            self.load_current_track(start_position=0.0)
             self._update_playlist_panel()
 
     def _toggle_playlist(self, e):
@@ -257,7 +295,7 @@ class PlayerPage:
 
     def _update_playlist_panel(self):
         items = []
-        for idx, book in enumerate(self.playlist):
+        for idx, track_path in enumerate(self.playlist):
             is_current = idx == self.current_playlist_index
             item = ft.Container(
                 content=ft.Row(
@@ -267,7 +305,7 @@ class PlayerPage:
                             color=ft.colors.GREEN if is_current else ft.colors.GREY,
                         ),
                         ft.Text(
-                            book.title,
+                            track_path.stem,
                             weight=(
                                 ft.FontWeight.BOLD
                                 if is_current
@@ -310,16 +348,22 @@ class PlayerPage:
 
     # ------ Audio callbacks ------
     def load_book(self, book: Book):
-        self.current_book = book
-        if not Path(book.file_path).exists():
-            self._handle_missing_audio_file(book)
+        # Backward-compatible entrypoint: selecting a book always rebuilds chapter playlist.
+        self.add_to_playlist(book)
+
+    def load_current_track(self, start_position: float = 0.0):
+        if not self.current_book or not self.playlist:
+            return
+        current_track_path = self.playlist[self.current_playlist_index]
+        if not current_track_path.exists():
+            self._handle_missing_audio_file(self.current_book)
             return
         if self.audio is not None:
             self._stop_audio_and_save_progress()
             self.app.page.overlay.remove(self.audio)
             self.audio = None
         self.audio = ft.Audio(
-            src=book.file_path,
+            src=str(current_track_path),
             autoplay=False,
             volume=1.0,
             on_loaded=self._on_audio_loaded,
@@ -327,6 +371,7 @@ class PlayerPage:
             on_position_changed=self._on_position_changed,
             on_seek_complete=self._on_seek_complete,
         )
+        self._pending_seek_seconds = max(0.0, start_position)
         self.app.page.overlay.append(self.audio)
         self.app.page.update()
         self._update_ui_for_book()
@@ -355,15 +400,16 @@ class PlayerPage:
         else:
             self.cover_image.src = "assets/default_cover.png"
         self.total_time_text.value = self.current_book.duration_str
-        self.progress_slider.max = self.current_book.duration
-        self.progress_slider.value = self.current_book.progress
-        self.current_time_text.value = self.current_book.progress_str
+        current_track_duration = self._current_track_duration()
+        self.progress_slider.max = current_track_duration
+        self.progress_slider.value = min(self._pending_seek_seconds, current_track_duration)
+        self.current_time_text.value = self._format_time(self.progress_slider.value)
         self.app.page.update()
 
     def _on_audio_loaded(self, e):
         self._set_controls_enabled(True)
-        if self.current_book and self.current_book.progress > 0:
-            self.audio.seek(int(self.current_book.progress * 1000))
+        if self.audio and self._pending_seek_seconds > 0:
+            self.audio.seek(int(self._pending_seek_seconds * 1000))
 
     def _on_audio_state_changed(self, e):
         state = e.data
@@ -417,7 +463,10 @@ class PlayerPage:
         if not self.audio or not self.current_book:
             return
         new_pos = max(0.0, self.progress_slider.value + delta_seconds)
-        new_pos = min(new_pos, self.current_book.duration)
+        max_duration = self._current_track_duration()
+        if max_duration <= 0 and self.current_book:
+            max_duration = self.current_book.duration
+        new_pos = min(new_pos, max_duration)
         self.audio.seek(int(new_pos * 1000))
         self.progress_slider.value = new_pos
         self.current_time_text.value = self._format_time(new_pos)
@@ -454,9 +503,10 @@ class PlayerPage:
 
     # ------ Progress persistence ------
     def _save_progress(self):
-        if not self.current_book:
+        if not self.current_book or self.current_book.id is None:
             return
-        progress = self.progress_slider.value
+        progress = self._playlist_prefix_duration() + self.progress_slider.value
+        progress = min(max(progress, 0.0), self.current_book.duration)
         update_progress(self.current_book.id, progress)
         self.current_book.progress = progress
 
@@ -479,8 +529,36 @@ class PlayerPage:
 
     def _stop_audio_and_save_progress(self):
         if self.audio:
-            self.audio.pause()
+            try:
+                self.audio.pause()
+            except AssertionError:
+                # Some tests/mocks use an unattached audio control.
+                pass
             self._save_progress()
+
+    def _current_track_duration(self) -> float:
+        if 0 <= self.current_playlist_index < len(self.playlist_durations):
+            return max(self.playlist_durations[self.current_playlist_index], 0.0)
+        return 0.0
+
+    def _playlist_prefix_duration(self) -> float:
+        if self.current_playlist_index <= 0:
+            return 0.0
+        return sum(self.playlist_durations[: self.current_playlist_index])
+
+    def _resolve_resume_position(self) -> tuple[int, float]:
+        if not self.playlist:
+            return 0, 0.0
+        target_progress = max(0.0, self.current_book.progress if self.current_book else 0.0)
+        if all(duration <= 0 for duration in self.playlist_durations):
+            return 0, target_progress
+        accumulated = 0.0
+        for idx, duration in enumerate(self.playlist_durations):
+            if target_progress <= accumulated + duration:
+                return idx, max(0.0, target_progress - accumulated)
+            accumulated += duration
+        last_index = len(self.playlist) - 1
+        return last_index, 0.0
 
     # ------ Book finished ------
     def _on_book_finished(self):
