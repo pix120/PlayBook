@@ -179,3 +179,5 @@ pyrightconfig.json
 data/playbook.db
 data/covers/
 config/user_config.json
+requirements-lock.txt
+requirements-dev.txt
