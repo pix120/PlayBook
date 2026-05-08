@@ -19,7 +19,7 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           pip install flet-cli
       - name: Build EXE
         run: |
@@ -42,7 +42,7 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           pip install flet-cli
       - name: Build binary with flet pack
         run: |
