@@ -21,6 +21,7 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           pip install flet-cli
+          pip install pyinstaller
       - name: Build EXE
         run: |
           flet pack src/main.py --name PlayBook --icon assets/icon.png --add-data "assets;assets" --add-data "config;config" --onedir
