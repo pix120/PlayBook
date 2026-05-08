@@ -1,0 +1,108 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install flet-cli
+      - name: Build EXE
+        run: |
+          flet pack src/main.py --name PlayBook --icon assets/icon.png --add-data "assets;assets" --add-data "config;config" --add-data "data;data" --onedir
+      - name: Archive
+        run: Compress-Archive -Path dist/PlayBook/* -DestinationPath playbook-windows-x64.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: playbook-windows-x64.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install flet-cli
+      - name: Build binary with flet pack
+        run: |
+          flet pack src/main.py --name playbook --icon assets/icon.png --add-data "assets:assets" --add-data "config:config" --add-data "data:data" --onedir
+      - name: Prepare DEB structure
+        run: |
+          mkdir -p pkg/deb/usr/local/bin/playbook
+          cp -r dist/playbook/* pkg/deb/usr/local/bin/playbook/
+          mkdir -p pkg/deb/usr/share/applications
+          cat > pkg/deb/usr/share/applications/playbook.desktop <<EOF
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=PlayBook
+          Comment=Аудиоплеер для книг
+          Exec=/usr/local/bin/playbook/playbook
+          Icon=/usr/local/bin/playbook/assets/icon.png
+          Terminal=false
+          Categories=AudioVideo;Player;
+          EOF
+      - name: Install fpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev build-essential
+          sudo gem install fpm
+      - name: Build DEB
+        run: |
+          cd pkg/deb
+          fpm -s dir -t deb -n playbook -v 0.0.1 -C . \
+            -p ../../playbook_0.0.1_amd64.deb \
+            -d "libgtk-3-0" -d "libmpv1" \
+            --description "Аудиоплеер для аудиокниг."
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: playbook_0.0.1_amd64.deb
+
+  create-release:
+    needs: [build-windows, build-linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            windows-build/*.zip
+            linux-deb/*.deb
+          name: PlayBook ${{ github.ref_name }}
+          body: |
+            ## Что нового
+            - Первый публичный релиз
+            - Сканирование папок с аудиокнигами
+            - Аудиоплеер с плейлистом и таймером сна
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
