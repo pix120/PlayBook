@@ -6,12 +6,24 @@ from pathlib import Path
 from typing import Iterator, List, Dict
 
 import mutagen
+import re
 
 from .models.book import Book, BookStatus
 from .db.database import add_book, get_all_books, update_book, delete_book
 from .cover_manager import save_cover
 
 AUDIO_EXTENSIONS = {".mp3", ".m4b", ".m4a", ".ogg", ".flac", ".wav", ".opus"}
+
+
+def _natural_key(path: Path):
+    """
+    Ключ для естественной сортировки: разбивает имя на части (текст + числа).
+    Пример: 'file10part2.txt' -> ['file', 10, 'part', 2, '.txt']
+    """
+    return [
+        int(part) if part.isdigit() else part.lower()
+        for part in re.split(r"(\d+)", path.name)
+    ]
 
 
 def find_audio_files(paths: List[Path]) -> Iterator[Path]:
@@ -125,7 +137,7 @@ def scan_and_update_library(root_paths: List[Path]) -> Iterator[dict]:
     updated_count = 0
 
     for idx, (folder_path, files_in_folder) in enumerate(folder_items, 1):
-        sorted_files = sorted(files_in_folder, key=lambda p: p.name.lower())
+        sorted_files = sorted(files_in_folder, key=_natural_key)
         representative_file = sorted_files[0]
         yield {
             "type": "progress",

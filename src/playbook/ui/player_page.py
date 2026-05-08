@@ -7,6 +7,8 @@ from typing import Optional, List, TYPE_CHECKING
 
 import flet as ft
 
+import re
+
 if TYPE_CHECKING:
     from .app import PlayBookApp
 
@@ -130,6 +132,17 @@ class PlayerPage:
 
         self.content = None
 
+    @staticmethod
+    def _natural_key(path: Path):
+        """
+        Ключ для естественной сортировки: разбивает имя на части (текст + числа).
+        Пример: 'file10part2.txt' -> ['file', 10, 'part', 2, '.txt']
+        """
+        return [
+            int(part) if part.isdigit() else part.lower()
+            for part in re.split(r"(\d+)", path.name)
+        ]
+
     def build(self) -> ft.Container:
         self.content = ft.Container(
             content=ft.Column(
@@ -200,7 +213,7 @@ class PlayerPage:
                     for path in book_folder.iterdir()
                     if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
                 ],
-                key=lambda path: path.name.lower(),
+                key=PlayerPage._natural_key,
             )
         elif book_folder.suffix.lower() in AUDIO_EXTENSIONS:
             # Backward compatibility for existing single-file records/tests.
@@ -402,7 +415,9 @@ class PlayerPage:
         self.total_time_text.value = self.current_book.duration_str
         current_track_duration = self._current_track_duration()
         self.progress_slider.max = current_track_duration
-        self.progress_slider.value = min(self._pending_seek_seconds, current_track_duration)
+        self.progress_slider.value = min(
+            self._pending_seek_seconds, current_track_duration
+        )
         self.current_time_text.value = self._format_time(self.progress_slider.value)
         self.app.page.update()
 
@@ -549,7 +564,9 @@ class PlayerPage:
     def _resolve_resume_position(self) -> tuple[int, float]:
         if not self.playlist:
             return 0, 0.0
-        target_progress = max(0.0, self.current_book.progress if self.current_book else 0.0)
+        target_progress = max(
+            0.0, self.current_book.progress if self.current_book else 0.0
+        )
         if all(duration <= 0 for duration in self.playlist_durations):
             return 0, target_progress
         accumulated = 0.0

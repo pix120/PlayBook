@@ -78,21 +78,25 @@ def test_scan_adds_new_books():
     assert books[0].duration == 200.0
 
 
-def test_scan_updates_existing_book_with_cover():
+def test_scan_updates_existing_book_with_cover(tmp_path):
+    # Создаём существующую книгу в БД с file_path = папка tmp_path
     add_book(
         Book(
             title="Old Title",
             author="Old Author",
             duration=50.0,
-            file_path="/fake",
+            file_path=str(tmp_path),  # используем реальную папку
             status=BookStatus.STARTED,
             progress=10.0,
         )
     )
 
-    fake_paths = [Path("/fake/existing.mp3")]
+    # В папке создаём реальный файл, чтобы find_audio_files его нашёл
+    test_file = tmp_path / "existing.mp3"
+    test_file.write_bytes(b"dummy audio")
+
+    # Мокаем только extract_metadata и save_cover
     with (
-        patch("playbook.scanner.find_audio_files", return_value=fake_paths),
         patch("playbook.scanner.extract_metadata") as mock_extract,
         patch("playbook.scanner.save_cover") as mock_save,
     ):
@@ -102,21 +106,21 @@ def test_scan_updates_existing_book_with_cover():
             "duration": 200.0,
             "cover_data": b"fake",
         }
-        mock_save.return_value = Path("/fake/cover/saved.jpg")
+        mock_save.return_value = tmp_path / "cover/saved.jpg"
 
-        events = list(scan_and_update_library([Path("/fake")]))
+        events = list(scan_and_update_library([tmp_path]))
 
     assert events[-1]["added"] == 0
     assert events[-1]["updated"] == 1
 
     book = get_all_books()[0]
-    assert book.title == "fake"
+    assert book.title == tmp_path.name  # имя папки tmp_path (случайное)
     assert book.author == "New Author"
     assert book.duration == 200.0
     assert book.status == BookStatus.STARTED
     assert book.progress == 10.0
-    assert book.cover_path == "/fake/cover/saved.jpg"
-    mock_save.assert_called_once_with("/fake/existing.mp3", b"fake")
+    assert book.cover_path == str(tmp_path / "cover/saved.jpg")
+    mock_save.assert_called_once_with(str(test_file), b"fake")
 
 
 def test_scan_save_cover_failure_still_updates(monkeypatch, tmp_path):

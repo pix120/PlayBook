@@ -182,3 +182,7 @@ config/user_config.json
 requirements-lock.txt
 requirements-dev.txt
 pyproject.toml
+pkg/
+dist/
+*.deb
+*.exe
