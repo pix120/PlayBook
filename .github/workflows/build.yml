@@ -23,7 +23,7 @@ jobs:
           pip install flet-cli
       - name: Build EXE
         run: |
-          flet pack src/main.py --name PlayBook --icon assets/icon.png --add-data "assets;assets" --add-data "config;config" --add-data "data;data" --onedir
+          flet pack src/main.py --name PlayBook --icon assets/icon.png --add-data "assets;assets" --add-data "config;config" --onedir
       - name: Archive
         run: Compress-Archive -Path dist/PlayBook/* -DestinationPath playbook-windows-x64.zip
       - name: Upload artifact
@@ -46,7 +46,7 @@ jobs:
           pip install flet-cli
       - name: Build binary with flet pack
         run: |
-          flet pack src/main.py --name playbook --icon assets/icon.png --add-data "assets:assets" --add-data "config:config" --add-data "data:data" --onedir
+          flet pack src/main.py --name playbook --icon assets/icon.png --add-data "assets:assets" --add-data "config:config" --onedir
       - name: Prepare DEB structure
         run: |
           mkdir -p pkg/deb/usr/local/bin/playbook
