@@ -80,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-deb
-          path: playbook_0.0.1_amd64.deb
+          path: playbook_amd64.deb
 
   create-release:
     needs: [build-windows, build-linux]
@@ -99,10 +99,7 @@ jobs:
             linux-deb/*.deb
           name: PlayBook ${{ github.ref_name }}
           body: |
-            ## Что нового
-            - Первый публичный релиз
-            - Сканирование папок с аудиокнигами
-            - Аудиоплеер с плейлистом и таймером сна
+            - Аудиоплеер для книг
           draft: false
           prerelease: false
         env:
