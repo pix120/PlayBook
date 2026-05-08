@@ -20,8 +20,6 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements-dev.txt
-          pip install flet-cli
-          pip install pyinstaller
       - name: Build EXE
         run: |
           flet pack src/main.py --name PlayBook --icon assets/icon.png --add-data "assets;assets" --add-data "config;config" --onedir
@@ -44,10 +42,12 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements-dev.txt
-          pip install flet-cli
       - name: Build binary with flet pack
         run: |
           flet pack src/main.py --name playbook --icon assets/icon.png --add-data "assets:assets" --add-data "config:config" --onedir
+      - name: Verify dist
+        run: |
+          ls -la dist/playbook || echo "ERROR: dist/playbook not found"
       - name: Prepare DEB structure
         run: |
           mkdir -p pkg/deb/usr/local/bin/playbook
@@ -68,19 +68,32 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby ruby-dev build-essential
-          sudo gem install fpm
+          sudo gem install fpm --no-document
       - name: Build DEB
         run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="0.0.0"
+          fi
+          echo "Building DEB for version $VERSION"
           cd pkg/deb
-          fpm -s dir -t deb -n playbook -v 0.0.1 -C . \
-            -p ../../playbook_amd64.deb \
-            -d "libgtk-3-0" -d "libmpv2" \
+          fpm -s dir -t deb -n playbook -v $VERSION -C . \
+            -p ../../playbook_${VERSION}_amd64.deb \
+            --no-auto-depends \
+            -d "libgtk-3-0" \
+            -d "libmpv2" \
+            -d "libgstreamer1.0-0" \
+            -d "gstreamer1.0-plugins-base" \
+            -d "gstreamer1.0-plugins-good" \
             --description "Аудиоплеер для аудиокниг."
+          echo "DEB created:"
+          ls -l ../../playbook_*.deb
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-deb
-          path: playbook_amd64.deb
+          path: playbook_*.deb
 
   create-release:
     needs: [build-windows, build-linux]
@@ -99,7 +112,9 @@ jobs:
             linux-deb/*.deb
           name: PlayBook ${{ github.ref_name }}
           body: |
-            - Аудиоплеер для книг
+            ## Что нового
+            - Аудиоплеер для книг с группировкой по папкам
+            - Поддержка плейлистов и таймера сна
           draft: false
           prerelease: false
         env:
