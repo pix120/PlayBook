@@ -11,3 +11,5 @@ black>=26.3.1
 
 pyinstaller>=6.20.0
 flet-cli
+
+pillow>=12.2.0
