@@ -72,7 +72,7 @@ jobs:
       - name: Build DEB
         run: |
           cd pkg/deb
-          fpm -s dir -t deb -n playbook -v 0.0.1 -C . \
+          fpm -s dir -t deb -n playbook -d "libmpv2" -v 0.0.1 -C . \
             -p ../../playbook_0.0.1_amd64.deb \
             -d "libgtk-3-0" -d "libmpv1" \
             --description "Аудиоплеер для аудиокниг."
