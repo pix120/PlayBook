@@ -127,7 +127,8 @@ def test_audio_state_playing_and_paused(player_ctx):
     ev = MagicMock()
     ev.data = "playing"
     with patch.object(player, "_start_progress_updates"):
-        player._on_audio_state_changed(ev)
+        with patch("playbook.ui.player_page.update_book"):
+            player._on_audio_state_changed(ev)
     assert player.is_playing is True
     ev.data = "paused"
     with patch.object(player, "_stop_progress_updates"):

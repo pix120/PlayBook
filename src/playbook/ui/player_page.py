@@ -27,6 +27,7 @@ class PlayerPage:
         self.slider_being_dragged = False
         self._update_timer: Optional[threading.Timer] = None
         self._pending_seek_seconds = 0.0
+        self._seek_lock_time = 0.0
 
         # UI элементы
         self.cover_image = ft.Image(
@@ -51,21 +52,25 @@ class PlayerPage:
         )
         self.play_button = ft.IconButton(
             icon=ft.icons.PLAY_ARROW,
+            icon_size=32,
             tooltip="Play/Pause",
             on_click=self._on_play_pause,
         )
         self.stop_button = ft.IconButton(
             icon=ft.icons.STOP,
+            icon_size=32,
             tooltip="Stop",
             on_click=self._on_stop,
         )
         self.rewind_back_btn = ft.IconButton(
             icon=ft.icons.REPLAY_10,
+            icon_size=32,
             tooltip="Back 15s",
             on_click=lambda e: self._seek_relative(-15),
         )
         self.rewind_fwd_btn = ft.IconButton(
             icon=ft.icons.FORWARD_30,
+            icon_size=32,
             tooltip="Forward 15s",
             on_click=lambda e: self._seek_relative(15),
         )
@@ -84,14 +89,19 @@ class PlayerPage:
         )
         self.prev_button = ft.IconButton(
             icon=ft.icons.SKIP_PREVIOUS,
+            icon_size=32,
             tooltip="Previous",
             on_click=lambda e: self.play_previous(),
         )
         self.next_button = ft.IconButton(
-            icon=ft.icons.SKIP_NEXT, tooltip="Next", on_click=lambda e: self.play_next()
+            icon=ft.icons.SKIP_NEXT,
+            icon_size=32,
+            tooltip="Next",
+            on_click=lambda e: self.play_next(),
         )
         self.reset_progress_btn = ft.IconButton(
             icon=ft.icons.REFRESH,
+            icon_size=32,
             tooltip="Reset progress",
             on_click=self._confirm_reset_progress,
         )
@@ -104,6 +114,7 @@ class PlayerPage:
         self.playlist_visible = True
         self.toggle_playlist_btn = ft.IconButton(
             icon=ft.icons.PLAYLIST_PLAY,
+            icon_size=32,
             tooltip="Playlist",
             on_click=self._toggle_playlist,
         )
@@ -178,7 +189,7 @@ class PlayerPage:
                             self.speed_dropdown,
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
-                        spacing=6,
+                        spacing=10,
                     ),
                     ft.Row(
                         controls=[
@@ -221,7 +232,6 @@ class PlayerPage:
                 key=PlayerPage._natural_key,
             )
         elif book_folder.suffix.lower() in AUDIO_EXTENSIONS:
-            # Backward compatibility for existing single-file records/tests.
             chapter_files = [book_folder]
         else:
             self._handle_missing_audio_file(book)
@@ -366,7 +376,6 @@ class PlayerPage:
 
     # ------ Audio callbacks ------
     def load_book(self, book: Book):
-        # Backward-compatible entrypoint: selecting a book always rebuilds chapter playlist.
         self.add_to_playlist(book)
 
     def load_current_track(self, start_position: float = 0.0):
@@ -425,20 +434,16 @@ class PlayerPage:
             self._pending_seek_seconds, current_track_duration
         )
         self.current_time_text.value = self._format_time(self.progress_slider.value)
-        track_info = f"{self.current_playlist_index + 1}/{len(self.playlist)}"
-        pct = book.progress_percent
-        self.stats_text.value = (
-            f"Total: {book.duration_str}  |  "
-            f"Progress: {pct:.0f}%  |  "
-            f"Track: {track_info}"
-        )
+        self._update_stats(self.progress_slider.value)
         self.app.page.update()
 
     def _on_audio_loaded(self, e):
         self._set_controls_enabled(True)
-        if self.audio and self._pending_seek_seconds > 0:
-            self.slider_being_dragged = True
-            self.audio.seek(int(self._pending_seek_seconds * 1000))
+        if self.audio:
+            if self._pending_seek_seconds > 0:
+                self._seek_lock_time = time.time()
+                self.audio.seek(int(self._pending_seek_seconds * 1000))
+            self.audio.play()
 
     def _on_audio_state_changed(self, e):
         state = e.data
@@ -446,6 +451,9 @@ class PlayerPage:
             self.is_playing = True
             self.play_button.icon = ft.icons.PAUSE
             self._start_progress_updates()
+            if self.current_book and self.current_book.status == BookStatus.NEW:
+                self.current_book.status = BookStatus.STARTED
+                update_book(self.current_book)
         elif state in ("paused", "completed"):
             self.is_playing = False
             self.play_button.icon = ft.icons.PLAY_ARROW
@@ -457,15 +465,16 @@ class PlayerPage:
         self.app.page.update()
 
     def _on_position_changed(self, e):
-        if not self.slider_being_dragged:
+        if not self.slider_being_dragged and time.time() - self._seek_lock_time > 0.5:
             position_ms = e.data
             position_sec = int(position_ms) / 1000.0
             self.progress_slider.value = position_sec
             self.current_time_text.value = self._format_time(position_sec)
+            self._update_stats(position_sec)
             self.app.page.update()
 
     def _on_seek_complete(self, e):
-        self.slider_being_dragged = False
+        pass
 
     # ------ Play controls ------
     def _on_play_pause(self, e):
@@ -478,7 +487,6 @@ class PlayerPage:
 
     def _on_stop(self, e):
         if self.audio:
-            self.slider_being_dragged = True
             self.audio.pause()
             self.audio.seek(0)
             self.progress_slider.value = 0.0
@@ -487,12 +495,12 @@ class PlayerPage:
             self.play_button.icon = ft.icons.PLAY_ARROW
             self._save_progress()
             self._notify_mini_player()
+            self._seek_lock_time = time.time()
             self.app.page.update()
 
     def _seek_relative(self, delta_seconds: int):
         if not self.audio or not self.current_book:
             return
-        self.slider_being_dragged = True
         new_pos = max(0.0, self.progress_slider.value + delta_seconds)
         max_duration = self._current_track_duration()
         if max_duration <= 0 and self.current_book:
@@ -503,6 +511,7 @@ class PlayerPage:
         self.current_time_text.value = self._format_time(new_pos)
         self._save_progress()
         self._notify_mini_player()
+        self._seek_lock_time = time.time()
         self.app.page.update()
 
     def _on_slider_change_end(self, e):
@@ -513,6 +522,8 @@ class PlayerPage:
         self.current_time_text.value = self._format_time(new_pos)
         self._save_progress()
         self._notify_mini_player()
+        self.slider_being_dragged = False
+        self._seek_lock_time = time.time()
         self.app.page.update()
 
     def _on_speed_change(self, e):
@@ -562,7 +573,6 @@ class PlayerPage:
             try:
                 self.audio.pause()
             except AssertionError:
-                # Some tests/mocks use an unattached audio control.
                 pass
             self._save_progress()
 
@@ -701,7 +711,6 @@ class PlayerPage:
 
     def _reset_progress(self):
         if self.audio:
-            self.slider_being_dragged = True
             self.audio.seek(0)
         if self.current_book:
             self.current_book.progress = 0.0
@@ -709,6 +718,7 @@ class PlayerPage:
             update_book(self.current_book)
             self.progress_slider.value = 0.0
             self.current_time_text.value = "00:00"
+            self._seek_lock_time = time.time()
             self._update_ui_for_book()
             self._notify_mini_player()
 
@@ -722,6 +732,17 @@ class PlayerPage:
         if hours > 0:
             return f"{hours:02d}:{minutes:02d}:{secs:02d}"
         return f"{minutes:02d}:{secs:02d}"
+
+    def _update_stats(self, position_sec: float):
+        if self.current_book:
+            current_total = self._playlist_prefix_duration() + position_sec
+            pct = (current_total / self.current_book.duration * 100) if self.current_book.duration > 0 else 0
+            track_info = f"{self.current_playlist_index + 1}/{len(self.playlist)}" if self.playlist else "-"
+            self.stats_text.value = (
+                f"Total: {self.current_book.duration_str}  |  "
+                f"Progress: {pct:.0f}%  |  "
+                f"Track: {track_info}"
+            )
 
     def _notify_mini_player(self):
         if self.current_book:

@@ -14,11 +14,17 @@ _DEFAULT_COVER_B64: str | None = None
 def _get_default_cover_b64() -> str:
     global _DEFAULT_COVER_B64
     if _DEFAULT_COVER_B64 is None:
-        try:
-            with open("assets/default_cover.png", "rb") as f:
-                _DEFAULT_COVER_B64 = base64.b64encode(f.read()).decode("utf-8")
-        except (FileNotFoundError, OSError):
-            _DEFAULT_COVER_B64 = ""
+        for cover_path in (
+            Path(__file__).resolve().parents[3] / "assets" / "default_cover.png",
+            Path("assets/default_cover.png"),
+        ):
+            try:
+                with open(cover_path, "rb") as f:
+                    _DEFAULT_COVER_B64 = base64.b64encode(f.read()).decode("utf-8")
+                    return _DEFAULT_COVER_B64
+            except (FileNotFoundError, OSError):
+                continue
+        _DEFAULT_COVER_B64 = ""
     return _DEFAULT_COVER_B64
 
 
