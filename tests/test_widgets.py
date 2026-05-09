@@ -24,7 +24,7 @@ def test_grid_card_creation(sample_book):
     assert isinstance(card.content, ft.Stack)
     image = card.content.controls[0]
     assert isinstance(image, ft.Image)
-    assert image.src == "assets/default_cover.png"
+    assert image.src_base64 or image.src
 
 
 def test_grid_card_has_popup_menu(sample_book):
@@ -62,6 +62,7 @@ def test_list_item_creation(sample_book):
     assert isinstance(row, ft.Row)
     images = [c for c in row.controls if isinstance(c, ft.Image)]
     assert len(images) == 1
+    assert images[0].src_base64 or images[0].src
 
 
 def test_list_item_has_popup_menu(sample_book):

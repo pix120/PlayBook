@@ -6,6 +6,7 @@ from pathlib import Path
 from .library_page import LibraryPage
 from .player_page import PlayerPage
 from .settings_page import SettingsPage
+from .widgets import get_cover_kwargs
 
 
 class PlayBookApp:
@@ -113,7 +114,7 @@ class PlayBookApp:
 
     def _create_mini_player(self) -> ft.Container:
         self.mini_cover = ft.Image(
-            src="assets/default_cover.png",
+            **get_cover_kwargs(None),
             width=40,
             height=40,
             fit="cover",
@@ -195,12 +196,11 @@ class PlayBookApp:
             self.mini_player.visible = False
         else:
             self.mini_player.visible = True
-            cover = (
-                str(Path(book.cover_path).resolve())
-                if book.cover_path and Path(book.cover_path).exists()
-                else "assets/default_cover.png"
-            )
-            self.mini_cover.src = cover
+            cover_kw = get_cover_kwargs(book.cover_path)
+            if "src_base64" in cover_kw:
+                self.mini_cover.src_base64 = cover_kw["src_base64"]
+            else:
+                self.mini_cover.src = cover_kw["src"]
             self.mini_title.value = book.title
             self.mini_author.value = book.author
             self.mini_play_pause_btn.icon = (

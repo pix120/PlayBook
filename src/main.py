@@ -12,5 +12,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    # Flet 0.24.x exposes `ft.app`; `ft.run` was added in a later release.
-    ft.app(main)
+    ft.app(main, assets_dir="assets")

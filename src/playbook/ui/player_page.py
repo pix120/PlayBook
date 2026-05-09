@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 from ..models.book import Book, BookStatus
 from ..db.database import update_progress, update_book
 from ..scanner import AUDIO_EXTENSIONS, extract_metadata
+from .widgets import get_cover_kwargs
 
 
 class PlayerPage:
@@ -29,7 +30,7 @@ class PlayerPage:
 
         # UI элементы
         self.cover_image = ft.Image(
-            src="assets/default_cover.png",
+            **get_cover_kwargs(None),
             width=250,
             height=250,
             fit="cover",
@@ -39,6 +40,7 @@ class PlayerPage:
         self.author_text = ft.Text("", size=16, color=ft.colors.GREY)
         self.current_time_text = ft.Text("00:00", size=14)
         self.total_time_text = ft.Text("00:00", size=14)
+        self.stats_text = ft.Text("", size=13, color=ft.colors.GREY)
         self.progress_slider = ft.Slider(
             min=0,
             max=1.0,
@@ -186,7 +188,7 @@ class PlayerPage:
                         alignment=ft.MainAxisAlignment.CENTER,
                         spacing=10,
                     ),
-
+                    self.stats_text,
                     self.playlist_panel,
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -408,25 +410,34 @@ class PlayerPage:
     def _update_ui_for_book(self):
         if not self.current_book:
             return
-        self.title_text.value = self.current_book.title
-        self.author_text.value = self.current_book.author
-        cover_path = self.current_book.cover_path
-        if cover_path and Path(cover_path).exists():
-            self.cover_image.src = str(Path(cover_path).resolve())
+        book = self.current_book
+        self.title_text.value = book.title
+        self.author_text.value = book.author
+        cover_kw = get_cover_kwargs(book.cover_path)
+        if "src_base64" in cover_kw:
+            self.cover_image.src_base64 = cover_kw["src_base64"]
         else:
-            self.cover_image.src = "assets/default_cover.png"
-        self.total_time_text.value = self.current_book.duration_str
+            self.cover_image.src = cover_kw["src"]
         current_track_duration = self._current_track_duration()
+        self.total_time_text.value = self._format_time(current_track_duration)
         self.progress_slider.max = current_track_duration
         self.progress_slider.value = min(
             self._pending_seek_seconds, current_track_duration
         )
         self.current_time_text.value = self._format_time(self.progress_slider.value)
+        track_info = f"{self.current_playlist_index + 1}/{len(self.playlist)}"
+        pct = book.progress_percent
+        self.stats_text.value = (
+            f"Total: {book.duration_str}  |  "
+            f"Progress: {pct:.0f}%  |  "
+            f"Track: {track_info}"
+        )
         self.app.page.update()
 
     def _on_audio_loaded(self, e):
         self._set_controls_enabled(True)
         if self.audio and self._pending_seek_seconds > 0:
+            self.slider_being_dragged = True
             self.audio.seek(int(self._pending_seek_seconds * 1000))
 
     def _on_audio_state_changed(self, e):
@@ -454,7 +465,7 @@ class PlayerPage:
             self.app.page.update()
 
     def _on_seek_complete(self, e):
-        pass
+        self.slider_being_dragged = False
 
     # ------ Play controls ------
     def _on_play_pause(self, e):
@@ -467,6 +478,7 @@ class PlayerPage:
 
     def _on_stop(self, e):
         if self.audio:
+            self.slider_being_dragged = True
             self.audio.pause()
             self.audio.seek(0)
             self.progress_slider.value = 0.0
@@ -480,6 +492,7 @@ class PlayerPage:
     def _seek_relative(self, delta_seconds: int):
         if not self.audio or not self.current_book:
             return
+        self.slider_being_dragged = True
         new_pos = max(0.0, self.progress_slider.value + delta_seconds)
         max_duration = self._current_track_duration()
         if max_duration <= 0 and self.current_book:
@@ -497,7 +510,6 @@ class PlayerPage:
             return
         new_pos = self.progress_slider.value
         self.audio.seek(int(new_pos * 1000))
-        self.slider_being_dragged = False
         self.current_time_text.value = self._format_time(new_pos)
         self._save_progress()
         self._notify_mini_player()
@@ -689,6 +701,7 @@ class PlayerPage:
 
     def _reset_progress(self):
         if self.audio:
+            self.slider_being_dragged = True
             self.audio.seek(0)
         if self.current_book:
             self.current_book.progress = 0.0

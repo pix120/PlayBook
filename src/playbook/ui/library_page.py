@@ -26,6 +26,7 @@ class LibraryPage:
         self.book_container = ft.Container(expand=True)
 
     def build(self) -> ft.Column:
+        self._update_filter_button_styles()
         filter_row = ft.Row(
             controls=[ft.Text("Status:", weight=ft.FontWeight.BOLD)]
             + self.filter_buttons
@@ -38,6 +39,13 @@ class LibraryPage:
             controls=[filter_row, ft.Divider(), self.book_container],
             expand=True,
         )
+
+    def _update_filter_button_styles(self):
+        filters = [None, BookStatus.NEW, BookStatus.STARTED, BookStatus.FINISHED]
+        for btn, status in zip(self.filter_buttons, filters):
+            selected = self._filter == status
+            btn.bgcolor = ft.colors.PRIMARY if selected else ft.colors.SURFACE
+            btn.color = ft.colors.ON_PRIMARY if selected else ft.colors.ON_SURFACE
 
     def _create_filter_buttons(self):
         filters = [
@@ -60,16 +68,7 @@ class LibraryPage:
 
     def _set_filter(self, status):
         self._filter = status
-        filters = [
-            ("All", None),
-            ("New", BookStatus.NEW),
-            ("Started", BookStatus.STARTED),
-            ("Finished", BookStatus.FINISHED),
-        ]
-        for btn, (_, s) in zip(self.filter_buttons, filters):
-            selected = s == status
-            btn.bgcolor = ft.colors.PRIMARY if selected else ft.colors.SURFACE
-            btn.color = ft.colors.ON_PRIMARY if selected else ft.colors.ON_SURFACE
+        self._update_filter_button_styles()
         self._render_books()
         self.app.page.update()
 

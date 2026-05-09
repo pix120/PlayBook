@@ -1,10 +1,41 @@
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 import flet as ft
 from ..models.book import Book, BookStatus
 
-DEFAULT_COVER_PATH = "assets/default_cover.png"
+DEFAULT_COVER_PATH = "/assets/default_cover.png"
+
+_COVER_CACHE: dict[str, str] = {}
+_DEFAULT_COVER_B64: str | None = None
+
+
+def _get_default_cover_b64() -> str:
+    global _DEFAULT_COVER_B64
+    if _DEFAULT_COVER_B64 is None:
+        try:
+            with open("assets/default_cover.png", "rb") as f:
+                _DEFAULT_COVER_B64 = base64.b64encode(f.read()).decode("utf-8")
+        except (FileNotFoundError, OSError):
+            _DEFAULT_COVER_B64 = ""
+    return _DEFAULT_COVER_B64
+
+
+def get_cover_kwargs(cover_path: str | None) -> dict:
+    if cover_path and Path(cover_path).exists():
+        resolved = str(Path(cover_path).resolve())
+        if resolved not in _COVER_CACHE:
+            try:
+                with open(resolved, "rb") as f:
+                    _COVER_CACHE[resolved] = base64.b64encode(f.read()).decode("utf-8")
+            except (FileNotFoundError, OSError):
+                return {"src": DEFAULT_COVER_PATH}
+        return {"src_base64": _COVER_CACHE[resolved]}
+    b64 = _get_default_cover_b64()
+    if b64:
+        return {"src_base64": b64}
+    return {"src": DEFAULT_COVER_PATH}
 
 
 class BookGridCard(ft.Container):
@@ -12,18 +43,14 @@ class BookGridCard(ft.Container):
         super().__init__()
         self.book = book
         self.on_click = on_click
-        cover_src = (
-            str(Path(book.cover_path).resolve())
-            if book.cover_path and Path(book.cover_path).exists()
-            else DEFAULT_COVER_PATH
-        )
+        cover_kwargs = get_cover_kwargs(book.cover_path)
         progress_pct = (book.progress / book.duration) if book.duration > 0 else 0.0
         progress_pct = min(max(progress_pct, 0.0), 1.0)
 
         self.content = ft.Stack(
             controls=[
                 ft.Image(
-                    src=cover_src,
+                    **cover_kwargs,
                     fit="cover",
                     width=float("inf"),
                     height=float("inf"),
@@ -91,18 +118,14 @@ class BookListItem(ft.Container):
     def __init__(self, book: Book, on_click, on_delete=None):
         super().__init__()
         self.book = book
-        cover_src = (
-            str(Path(book.cover_path).resolve())
-            if book.cover_path and Path(book.cover_path).exists()
-            else DEFAULT_COVER_PATH
-        )
+        cover_kwargs = get_cover_kwargs(book.cover_path)
         progress_pct = (book.progress / book.duration) if book.duration > 0 else 0.0
         progress_pct = min(max(progress_pct, 0.0), 1.0)
 
         self.content = ft.Row(
             controls=[
                 ft.Image(
-                    src=cover_src, width=48, height=48, fit="cover", border_radius=8
+                    **cover_kwargs, width=48, height=48, fit="cover", border_radius=8
                 ),
                 ft.Column(
                     controls=[
