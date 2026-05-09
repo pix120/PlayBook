@@ -43,6 +43,7 @@ class PlayerPage:
             min=0,
             max=1.0,
             value=0.0,
+            expand=True,
             on_change_start=lambda e: setattr(self, "slider_being_dragged", True),
             on_change_end=self._on_slider_change_end,
         )
@@ -94,11 +95,11 @@ class PlayerPage:
         )
         self.playlist_panel = ft.Container(
             content=ft.Text(""),
-            height=0,
+            height=300,
             animate=ft.animation.Animation(300, ft.AnimationCurve.EASE_IN_OUT),
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
         )
-        self.playlist_visible = False
+        self.playlist_visible = True
         self.toggle_playlist_btn = ft.IconButton(
             icon=ft.icons.PLAYLIST_PLAY,
             tooltip="Playlist",
@@ -160,6 +161,7 @@ class PlayerPage:
                             self.total_time_text,
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        expand=True,
                     ),
                     ft.Row(
                         controls=[
@@ -171,19 +173,20 @@ class PlayerPage:
                             self.next_button,
                             self.reset_progress_btn,
                             self.toggle_playlist_btn,
+                            self.speed_dropdown,
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
                         spacing=6,
                     ),
                     ft.Row(
                         controls=[
-                            self.speed_dropdown,
                             self.sleep_timer_dropdown,
                             self.sleep_timer_label,
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
                         spacing=10,
                     ),
+
                     self.playlist_panel,
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -409,7 +412,7 @@ class PlayerPage:
         self.author_text.value = self.current_book.author
         cover_path = self.current_book.cover_path
         if cover_path and Path(cover_path).exists():
-            self.cover_image.src = cover_path
+            self.cover_image.src = str(Path(cover_path).resolve())
         else:
             self.cover_image.src = "assets/default_cover.png"
         self.total_time_text.value = self.current_book.duration_str

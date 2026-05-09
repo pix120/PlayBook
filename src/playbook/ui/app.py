@@ -14,6 +14,8 @@ class PlayBookApp:
         self.page.title = "PlayBook"
         self.page.padding = 0
         self.page.theme_mode = ft.ThemeMode.DARK
+        self.page.window.width = 1000
+        self.page.window.height = 700
 
         self.pages = {
             "library": LibraryPage(self),
@@ -194,7 +196,7 @@ class PlayBookApp:
         else:
             self.mini_player.visible = True
             cover = (
-                book.cover_path
+                str(Path(book.cover_path).resolve())
                 if book.cover_path and Path(book.cover_path).exists()
                 else "assets/default_cover.png"
             )

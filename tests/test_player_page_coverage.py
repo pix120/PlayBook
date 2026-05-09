@@ -92,7 +92,6 @@ def test_toggle_playlist_and_panel(player_ctx):
     player, _, page = player_ctx
     player.add_to_playlist(_book())
     player.build()
-    player._toggle_playlist(MagicMock())
     assert player.playlist_visible is True
     player._update_playlist_panel()
     page.update.assert_called()

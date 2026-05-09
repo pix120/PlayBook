@@ -13,7 +13,7 @@ class BookGridCard(ft.Container):
         self.book = book
         self.on_click = on_click
         cover_src = (
-            book.cover_path
+            str(Path(book.cover_path).resolve())
             if book.cover_path and Path(book.cover_path).exists()
             else DEFAULT_COVER_PATH
         )
@@ -78,7 +78,7 @@ class BookListItem(ft.Container):
         super().__init__()
         self.book = book
         cover_src = (
-            book.cover_path
+            str(Path(book.cover_path).resolve())
             if book.cover_path and Path(book.cover_path).exists()
             else DEFAULT_COVER_PATH
         )
