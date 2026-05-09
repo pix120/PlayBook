@@ -1,5 +1,3 @@
-"""Tests for the main shell: navigation rail, mini player, library, settings."""
-
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -114,6 +112,118 @@ def test_library_filters_view_toggle_and_select(
     lib._book_selected(sample_book)
     assert app.current_section == "player"
     lib.refresh_data()
+
+
+def test_filter_buttons_initial_state(user_config_path, monkeypatch, sample_book):
+    monkeypatch.setattr(
+        "playbook.ui.library_page.get_all_books",
+        lambda status=None: [sample_book],
+    )
+    page = _make_page()
+    app = PlayBookApp(page)
+    lib: LibraryPage = app.pages["library"]
+
+    buttons = lib.filter_buttons
+    assert len(buttons) == 4
+    assert buttons[0].text == "All"
+    assert buttons[1].text == "New"
+    assert buttons[2].text == "Started"
+    assert buttons[3].text == "Finished"
+
+
+def test_set_filter_updates_button_colors(user_config_path, monkeypatch, sample_book):
+    monkeypatch.setattr(
+        "playbook.ui.library_page.get_all_books",
+        lambda status=None: [sample_book],
+    )
+    page = _make_page()
+    app = PlayBookApp(page)
+    lib: LibraryPage = app.pages["library"]
+
+    lib._set_filter(BookStatus.NEW)
+    assert lib._filter == BookStatus.NEW
+
+    lib._set_filter(BookStatus.STARTED)
+    assert lib._filter == BookStatus.STARTED
+
+    lib._set_filter(None)
+    assert lib._filter is None
+
+
+def test_set_filter_calls_render_books(user_config_path, monkeypatch, sample_book):
+    monkeypatch.setattr(
+        "playbook.ui.library_page.get_all_books",
+        lambda status=None: [sample_book],
+    )
+    page = _make_page()
+    app = PlayBookApp(page)
+    lib: LibraryPage = app.pages["library"]
+    page.update.reset_mock()
+    lib._render_books = MagicMock()
+
+    lib._set_filter(BookStatus.FINISHED)
+    lib._render_books.assert_called_once()
+    page.update.assert_called_once()
+
+
+def test_delete_book_shows_dialog(user_config_path, monkeypatch, sample_book):
+    monkeypatch.setattr(
+        "playbook.ui.library_page.get_all_books",
+        lambda status=None: [sample_book],
+    )
+    page = _make_page()
+    app = PlayBookApp(page)
+    lib: LibraryPage = app.pages["library"]
+
+    lib._delete_book(sample_book)
+    assert page.dialog is not None
+    assert page.dialog.open is True
+    assert page.dialog.title.value == "Delete book?"
+    assert len(page.dialog.actions) == 2
+
+
+def test_delete_book_confirm_deletes_and_refreshes(
+    user_config_path, monkeypatch, sample_book
+):
+    monkeypatch.setattr(
+        "playbook.ui.library_page.get_all_books",
+        lambda status=None: [sample_book],
+    )
+    mock_delete = MagicMock()
+    monkeypatch.setattr("playbook.ui.library_page.delete_book", mock_delete)
+
+    page = _make_page()
+    app = PlayBookApp(page)
+    lib: LibraryPage = app.pages["library"]
+    lib._render_books = MagicMock()
+
+    lib._delete_book(sample_book)
+    yes_button = page.dialog.actions[0]
+    yes_button.on_click(MagicMock())
+
+    mock_delete.assert_called_once_with(sample_book.id)
+    lib._render_books.assert_called_once()
+
+
+def test_delete_book_cancel_does_not_delete(
+    user_config_path, monkeypatch, sample_book
+):
+    monkeypatch.setattr(
+        "playbook.ui.library_page.get_all_books",
+        lambda status=None: [sample_book],
+    )
+    mock_delete = MagicMock()
+    monkeypatch.setattr("playbook.ui.library_page.delete_book", mock_delete)
+
+    page = _make_page()
+    app = PlayBookApp(page)
+    lib: LibraryPage = app.pages["library"]
+
+    lib._delete_book(sample_book)
+    no_button = page.dialog.actions[1]
+    no_button.on_click(MagicMock())
+
+    mock_delete.assert_not_called()
 
 
 def test_refresh_current_page(user_config_path, monkeypatch, sample_book):

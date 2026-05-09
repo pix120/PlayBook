@@ -8,7 +8,7 @@ DEFAULT_COVER_PATH = "assets/default_cover.png"
 
 
 class BookGridCard(ft.Container):
-    def __init__(self, book: Book, on_click):
+    def __init__(self, book: Book, on_click, on_delete=None):
         super().__init__()
         self.book = book
         self.on_click = on_click
@@ -63,6 +63,20 @@ class BookGridCard(ft.Container):
                         spacing=3,
                     ),
                 ),
+                ft.Container(
+                    content=ft.PopupMenuButton(
+                        icon=ft.icons.MORE_VERT,
+                        icon_color=ft.colors.WHITE,
+                        items=[
+                            ft.PopupMenuItem(
+                                text="Delete",
+                                on_click=lambda e: on_delete(book) if on_delete else None,
+                            ),
+                        ],
+                    ),
+                    alignment=ft.alignment.top_right,
+                    padding=5,
+                ),
             ],
             width=200,
             height=280,
@@ -74,7 +88,7 @@ class BookGridCard(ft.Container):
 
 
 class BookListItem(ft.Container):
-    def __init__(self, book: Book, on_click):
+    def __init__(self, book: Book, on_click, on_delete=None):
         super().__init__()
         self.book = book
         cover_src = (
@@ -120,6 +134,15 @@ class BookListItem(ft.Container):
                     ft.Icon(name=ft.icons.CHECK_CIRCLE, color=ft.colors.GREEN, size=20)
                     if book.status == BookStatus.FINISHED
                     else ft.Text(f"{int(progress_pct*100)}%")
+                ),
+                ft.PopupMenuButton(
+                    icon=ft.icons.MORE_VERT,
+                    items=[
+                        ft.PopupMenuItem(
+                            text="Delete",
+                            on_click=lambda e: on_delete(book) if on_delete else None,
+                        ),
+                    ],
                 ),
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,

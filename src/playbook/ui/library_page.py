@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .app import PlayBookApp
 
-from ..db.database import get_all_books
-from ..models.book import BookStatus
+from ..db.database import get_all_books, delete_book
+from ..models.book import Book, BookStatus
 from .widgets import BookGridCard, BookListItem
 
 
@@ -50,12 +50,10 @@ class LibraryPage:
         for label, status in filters:
             selected = self._filter == status
             btn = ft.ElevatedButton(
-                content=ft.Text(
-                    label,
-                    color=ft.colors.ON_PRIMARY if selected else ft.colors.ON_SURFACE,
-                ),
+                text=label,
                 on_click=lambda e, s=status: self._set_filter(s),
                 bgcolor=ft.colors.PRIMARY if selected else ft.colors.SURFACE,
+                color=ft.colors.ON_PRIMARY if selected else ft.colors.ON_SURFACE,
             )
             buttons.append(btn)
         return buttons
@@ -71,10 +69,7 @@ class LibraryPage:
         for btn, (_, s) in zip(self.filter_buttons, filters):
             selected = s == status
             btn.bgcolor = ft.colors.PRIMARY if selected else ft.colors.SURFACE
-            if isinstance(btn.content, ft.Text):
-                btn.content.color = (
-                    ft.colors.ON_PRIMARY if selected else ft.colors.ON_SURFACE
-                )
+            btn.color = ft.colors.ON_PRIMARY if selected else ft.colors.ON_SURFACE
         self._render_books()
         self.app.page.update()
 
@@ -97,7 +92,8 @@ class LibraryPage:
                 spacing=10,
                 run_spacing=10,
                 controls=[
-                    BookGridCard(book, on_click=self._book_selected) for book in books
+                    BookGridCard(book, on_click=self._book_selected, on_delete=self._delete_book)
+                    for book in books
                 ],
             )
         else:
@@ -105,7 +101,8 @@ class LibraryPage:
                 expand=True,
                 spacing=10,
                 controls=[
-                    BookListItem(book, on_click=self._book_selected) for book in books
+                    BookListItem(book, on_click=self._book_selected, on_delete=self._delete_book)
+                    for book in books
                 ],
             )
         self.book_container.content = content
@@ -115,6 +112,29 @@ class LibraryPage:
         if player:
             player.add_to_playlist(book)
             self.app.switch_to_section("player")
+
+    def _delete_book(self, book: Book):
+        def on_yes(e):
+            delete_book(book.id)
+            self._render_books()
+            self.app.page.dialog.open = False
+            self.app.page.update()
+
+        def on_no(e):
+            self.app.page.dialog.open = False
+            self.app.page.update()
+
+        dialog = ft.AlertDialog(
+            title=ft.Text("Delete book?"),
+            content=ft.Text(f'Delete "{book.title}" from library?'),
+            actions=[
+                ft.TextButton(text="Yes", on_click=on_yes),
+                ft.TextButton(text="No", on_click=on_no),
+            ],
+        )
+        self.app.page.dialog = dialog
+        dialog.open = True
+        self.app.page.update()
 
     def refresh_data(self):
         self._render_books()
