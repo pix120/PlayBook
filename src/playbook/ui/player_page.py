@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 from ..models.book import Book, BookStatus
 from ..db.database import update_progress, update_book
 from ..scanner import AUDIO_EXTENSIONS, extract_metadata
-from .widgets import get_cover_kwargs
 
 
 class PlayerPage:
@@ -30,15 +29,8 @@ class PlayerPage:
         self._seek_lock_time = 0.0
 
         # UI элементы
-        self.cover_image = ft.Image(
-            **get_cover_kwargs(None),
-            width=250,
-            height=250,
-            fit="cover",
-            border_radius=15,
-        )
-        self.title_text = ft.Text("", size=22, weight=ft.FontWeight.BOLD)
-        self.author_text = ft.Text("", size=16, color=ft.colors.GREY)
+        self.title_text = ft.Text("", size=26, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)
+        self.author_text = ft.Text("", size=18, color=ft.colors.GREY, text_align=ft.TextAlign.CENTER)
         self.current_time_text = ft.Text("00:00", size=14)
         self.total_time_text = ft.Text("00:00", size=14)
         self.stats_text = ft.Text("", size=13, color=ft.colors.GREY)
@@ -161,12 +153,9 @@ class PlayerPage:
         self.content = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Row(
-                        controls=[self.cover_image],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                    ),
                     self.title_text,
                     self.author_text,
+                    ft.Divider(height=1, color=ft.colors.with_opacity(0.1, ft.colors.WHITE)),
                     ft.Row(
                         controls=[
                             self.current_time_text,
@@ -422,11 +411,6 @@ class PlayerPage:
         book = self.current_book
         self.title_text.value = book.title
         self.author_text.value = book.author
-        cover_kw = get_cover_kwargs(book.cover_path)
-        if "src_base64" in cover_kw:
-            self.cover_image.src_base64 = cover_kw["src_base64"]
-        else:
-            self.cover_image.src = cover_kw["src"]
         current_track_duration = self._current_track_duration()
         self.total_time_text.value = self._format_time(current_track_duration)
         self.progress_slider.max = current_track_duration

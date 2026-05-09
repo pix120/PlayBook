@@ -1,7 +1,7 @@
 import pytest
 import flet as ft
 from playbook.models.book import Book, BookStatus
-from playbook.ui.widgets import BookGridCard, BookListItem
+from playbook.ui.widgets import BookGridCard, BookListItem, book_binding
 
 
 @pytest.fixture
@@ -18,13 +18,17 @@ def sample_book():
     )
 
 
+def test_book_binding_creation():
+    binding = book_binding("Test Title", "Test Author")
+    assert isinstance(binding, ft.Container)
+
+
 def test_grid_card_creation(sample_book):
     card = BookGridCard(sample_book, on_click=lambda b: None)
     assert isinstance(card, ft.Container)
     assert isinstance(card.content, ft.Stack)
-    image = card.content.controls[0]
-    assert isinstance(image, ft.Image)
-    assert image.src_base64 or image.src
+    first = card.content.controls[0]
+    assert isinstance(first, ft.Container)
 
 
 def test_grid_card_has_popup_menu(sample_book):
@@ -60,9 +64,8 @@ def test_list_item_creation(sample_book):
     item = BookListItem(sample_book, on_click=lambda b: None)
     row = item.content
     assert isinstance(row, ft.Row)
-    images = [c for c in row.controls if isinstance(c, ft.Image)]
-    assert len(images) == 1
-    assert images[0].src_base64 or images[0].src
+    first = row.controls[0]
+    assert isinstance(first, ft.Container)
 
 
 def test_list_item_has_popup_menu(sample_book):

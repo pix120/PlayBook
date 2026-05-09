@@ -6,7 +6,6 @@ from pathlib import Path
 from .library_page import LibraryPage
 from .player_page import PlayerPage
 from .settings_page import SettingsPage
-from .widgets import get_cover_kwargs
 
 
 class PlayBookApp:
@@ -113,13 +112,6 @@ class PlayBookApp:
             self.page.update()
 
     def _create_mini_player(self) -> ft.Container:
-        self.mini_cover = ft.Image(
-            **get_cover_kwargs(None),
-            width=40,
-            height=40,
-            fit="cover",
-            border_radius=4,
-        )
         self.mini_title = ft.Text(
             "",
             size=14,
@@ -154,16 +146,9 @@ class PlayBookApp:
         mini_info = ft.GestureDetector(
             expand=True,
             mouse_cursor=ft.MouseCursor.CLICK,
-            content=ft.Row(
-                controls=[
-                    self.mini_cover,
-                    ft.Column(
-                        controls=[self.mini_title, self.mini_author],
-                        spacing=2,
-                        expand=True,
-                    ),
-                ],
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            content=ft.Column(
+                controls=[self.mini_title, self.mini_author],
+                spacing=2,
             ),
             on_tap=lambda _: self.switch_to_section("player"),
         )
@@ -196,11 +181,6 @@ class PlayBookApp:
             self.mini_player.visible = False
         else:
             self.mini_player.visible = True
-            cover_kw = get_cover_kwargs(book.cover_path)
-            if "src_base64" in cover_kw:
-                self.mini_cover.src_base64 = cover_kw["src_base64"]
-            else:
-                self.mini_cover.src = cover_kw["src"]
             self.mini_title.value = book.title
             self.mini_author.value = book.author
             self.mini_play_pause_btn.icon = (
