@@ -40,7 +40,6 @@ def player_ctx():
     page.show_snack_bar = MagicMock()
     page.dialog = None
     app = MagicMock(page=page)
-    app.update_mini_player = MagicMock()
     app.pages = {"player": MagicMock()}
     player = PlayerPage(app)
     app.pages["player"] = player
@@ -219,10 +218,9 @@ def test_reset_progress_dialog_and_apply(player_ctx):
 
 
 def test_notify_mini_player_none(player_ctx):
-    player, app, _ = player_ctx
+    player, _, _ = player_ctx
     player.current_book = None
     player._notify_mini_player()
-    app.update_mini_player.assert_called_with(book=None)
 
 
 def test_on_book_finished_advances_or_stops(player_ctx):

@@ -57,6 +57,8 @@ jobs:
           mkdir -p pkg/deb/usr/local/bin/playbook
           cp -r dist/playbook/* pkg/deb/usr/local/bin/playbook/
           mkdir -p pkg/deb/usr/share/applications
+          mkdir -p pkg/deb/usr/share/icons/hicolor/48x48/apps
+          cp assets/icon.png pkg/deb/usr/share/icons/hicolor/48x48/apps/playbook.png
           cat > pkg/deb/usr/share/applications/playbook.desktop <<EOF
           [Desktop Entry]
           Version=1.0
@@ -64,7 +66,7 @@ jobs:
           Name=PlayBook
           Comment=Аудиоплеер для книг
           Exec=/usr/local/bin/playbook/playbook
-          Icon=/usr/local/bin/playbook/assets/icon.png
+          Icon=playbook
           Terminal=false
           Categories=AudioVideo;Player;
           EOF

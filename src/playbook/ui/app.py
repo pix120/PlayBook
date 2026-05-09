@@ -55,23 +55,13 @@ class PlayBookApp:
             content=self.pages[self.current_section].build(),
         )
 
-        self.mini_player = self._create_mini_player()
-        self.mini_player.visible = False
-
-        self.root_view = ft.Column(
+        self.root_view = ft.Row(
             controls=[
-                ft.Row(
-                    controls=[
-                        self.nav_rail,
-                        ft.VerticalDivider(width=1),
-                        self.content_area,
-                    ],
-                    expand=True,
-                ),
-                self.mini_player,
+                self.nav_rail,
+                ft.VerticalDivider(width=1),
+                self.content_area,
             ],
             expand=True,
-            spacing=0,
         )
 
         self.page.add(self.root_view)
@@ -110,95 +100,6 @@ class PlayBookApp:
             )
             self.content_area.content = self.pages[self.current_section].build()
             self.page.update()
-
-    def _create_mini_player(self) -> ft.Container:
-        self.mini_title = ft.Text(
-            "",
-            size=14,
-            weight=ft.FontWeight.BOLD,
-            max_lines=1,
-            overflow=ft.TextOverflow.ELLIPSIS,
-        )
-        self.mini_author = ft.Text(
-            "",
-            size=12,
-            color=ft.colors.GREY,
-            max_lines=1,
-            overflow=ft.TextOverflow.ELLIPSIS,
-        )
-        self.mini_play_pause_btn = ft.IconButton(
-            icon=ft.icons.PLAY_ARROW,
-            tooltip="Play/Pause",
-            on_click=self._mini_play_pause,
-        )
-        self.mini_next_btn = ft.IconButton(
-            icon=ft.icons.SKIP_NEXT,
-            tooltip="Next",
-            on_click=self._mini_next,
-        )
-        self.mini_progress_bar = ft.ProgressBar(
-            value=0.0,
-            color=ft.colors.GREEN_ACCENT_400,
-            bgcolor=ft.colors.SURFACE_VARIANT,
-            height=2,
-        )
-
-        mini_info = ft.GestureDetector(
-            expand=True,
-            mouse_cursor=ft.MouseCursor.CLICK,
-            content=ft.Column(
-                controls=[self.mini_title, self.mini_author],
-                spacing=2,
-            ),
-            on_tap=lambda _: self.switch_to_section("player"),
-        )
-
-        return ft.Container(
-            content=ft.Column(
-                controls=[
-                    self.mini_progress_bar,
-                    ft.Row(
-                        controls=[
-                            mini_info,
-                            self.mini_play_pause_btn,
-                            self.mini_next_btn,
-                        ],
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        expand=True,
-                    ),
-                ],
-                spacing=0,
-            ),
-            padding=ft.padding.only(left=10, right=10, bottom=5, top=5),
-            bgcolor=ft.colors.SURFACE_VARIANT,
-            visible=False,
-        )
-
-    def update_mini_player(
-        self, book=None, is_playing=False, progress=0.0, duration=0.0
-    ):
-        if book is None:
-            self.mini_player.visible = False
-        else:
-            self.mini_player.visible = True
-            self.mini_title.value = book.title
-            self.mini_author.value = book.author
-            self.mini_play_pause_btn.icon = (
-                ft.icons.PAUSE if is_playing else ft.icons.PLAY_ARROW
-            )
-            progress_pct = (progress / duration) if duration > 0 else 0.0
-            self.mini_progress_bar.value = min(max(progress_pct, 0.0), 1.0)
-        self.page.update()
-
-    def _mini_play_pause(self, e):
-        player = self.pages.get("player")
-        if player and player.audio:
-            player._on_play_pause(None)
-
-    def _mini_next(self, e):
-        player = self.pages.get("player")
-        if player:
-            player.play_next()
 
     def refresh_current_page(self):
         self.content_area.content = self.pages[self.current_section].build()

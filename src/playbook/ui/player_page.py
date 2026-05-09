@@ -136,6 +136,20 @@ class PlayerPage:
         self.sleep_timer_thread: Optional[threading.Thread] = None
         self._save_volume_before_timer = 1.0
 
+        # Volume control
+        self.volume_icon = ft.Icon(
+            name=ft.icons.VOLUME_UP,
+            size=20,
+            color=ft.colors.GREY,
+        )
+        self.volume_slider = ft.Slider(
+            min=0,
+            max=1.0,
+            value=1.0,
+            width=120,
+            on_change=self._on_volume_change,
+        )
+
         self.content = None
 
     @staticmethod
@@ -182,11 +196,13 @@ class PlayerPage:
                     ),
                     ft.Row(
                         controls=[
+                            self.volume_icon,
+                            self.volume_slider,
                             self.sleep_timer_dropdown,
                             self.sleep_timer_label,
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
-                        spacing=10,
+                        spacing=8,
                     ),
                     self.stats_text,
                     self.playlist_panel,
@@ -230,7 +246,7 @@ class PlayerPage:
                 ft.SnackBar(content=ft.Text(f"В папке нет аудиофайлов: {book_folder}"))
             )
             self._update_playlist_panel()
-            self._notify_mini_player()
+
             return
 
         self.playlist = chapter_files
@@ -241,7 +257,7 @@ class PlayerPage:
         self.current_playlist_index = track_index
         self.load_current_track(start_position=track_offset)
         self._update_playlist_panel()
-        self._notify_mini_player()
+
 
     def _remove_from_playlist(self, index: int):
         if 0 <= index < len(self.playlist):
@@ -259,7 +275,7 @@ class PlayerPage:
             elif index < self.current_playlist_index:
                 self.current_playlist_index -= 1
             self._update_playlist_panel()
-            self._notify_mini_player()
+
 
     def _move_playlist_item(self, index: int, direction: int):
         new_index = index + direction
@@ -393,7 +409,7 @@ class PlayerPage:
         self._update_ui_for_book()
         self._set_controls_enabled(False)
         self.play_button.icon = ft.icons.PLAY_ARROW
-        self._notify_mini_player()
+
 
     def _handle_missing_audio_file(self, book: Book):
         self.audio = None
@@ -445,7 +461,7 @@ class PlayerPage:
             if state == "completed":
                 self._on_book_finished()
             self._save_progress()
-        self._notify_mini_player()
+
         self.app.page.update()
 
     def _on_position_changed(self, e):
@@ -478,7 +494,7 @@ class PlayerPage:
             self.is_playing = False
             self.play_button.icon = ft.icons.PLAY_ARROW
             self._save_progress()
-            self._notify_mini_player()
+
             self._seek_lock_time = time.time()
             self.app.page.update()
 
@@ -494,7 +510,7 @@ class PlayerPage:
         self.progress_slider.value = new_pos
         self.current_time_text.value = self._format_time(new_pos)
         self._save_progress()
-        self._notify_mini_player()
+
         self._seek_lock_time = time.time()
         self.app.page.update()
 
@@ -505,7 +521,7 @@ class PlayerPage:
         self.audio.seek(int(new_pos * 1000))
         self.current_time_text.value = self._format_time(new_pos)
         self._save_progress()
-        self._notify_mini_player()
+
         self.slider_being_dragged = False
         self._seek_lock_time = time.time()
         self.app.page.update()
@@ -513,6 +529,18 @@ class PlayerPage:
     def _on_speed_change(self, e):
         if self.audio:
             self.audio.playback_rate = float(self.speed_dropdown.value)
+
+    def _on_volume_change(self, e):
+        val = self.volume_slider.value
+        if self.audio:
+            self.audio.volume = val
+        if val <= 0:
+            self.volume_icon.name = ft.icons.VOLUME_MUTE
+        elif val < 0.5:
+            self.volume_icon.name = ft.icons.VOLUME_DOWN
+        else:
+            self.volume_icon.name = ft.icons.VOLUME_UP
+        self.app.page.update()
 
     def _set_controls_enabled(self, enabled: bool):
         self.play_button.disabled = not enabled
@@ -704,7 +732,7 @@ class PlayerPage:
             self.current_time_text.value = "00:00"
             self._seek_lock_time = time.time()
             self._update_ui_for_book()
-            self._notify_mini_player()
+
 
     # ------ Helpers ------
     def _format_time(self, seconds: float) -> str:
@@ -729,12 +757,4 @@ class PlayerPage:
             )
 
     def _notify_mini_player(self):
-        if self.current_book:
-            self.app.update_mini_player(
-                book=self.current_book,
-                is_playing=self.is_playing,
-                progress=self.progress_slider.value,
-                duration=self.current_book.duration,
-            )
-        else:
-            self.app.update_mini_player(book=None)
+        pass

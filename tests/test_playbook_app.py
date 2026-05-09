@@ -60,22 +60,8 @@ def test_playbook_app_init_nav_mini_window(
     app.switch_to_section("settings")
     assert app.current_section == "settings"
 
-    app.update_mini_player(sample_book, True, 60.0, 120.0)
-    assert app.mini_player.visible is True
-    app.update_mini_player(None)
-    assert app.mini_player.visible is False
-
     player = app.pages["player"]
-    player.audio = MagicMock()
     player.current_book = sample_book
-    player._on_play_pause = MagicMock()
-    app._mini_play_pause(MagicMock())
-    player._on_play_pause.assert_called_once_with(None)
-
-    player.play_next = MagicMock()
-    app._mini_next(MagicMock())
-    player.play_next.assert_called_once()
-
     player._save_progress = MagicMock()
     we = MagicMock()
     we.data = "close"
