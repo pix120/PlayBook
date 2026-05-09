@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-import flet as ft
+import threading
 from pathlib import Path
+
+import flet as ft
 
 from .library_page import LibraryPage
 from .player_page import PlayerPage
 from .settings_page import SettingsPage
+from ..db.database import get_all_books
+from ..config import get_config, save_config
+from ..scanner import scan_and_update_library
 
 
 class PlayBookApp:
@@ -67,6 +72,9 @@ class PlayBookApp:
         self.page.add(self.root_view)
         self.page.update()
 
+        if not get_all_books():
+            self._show_first_run_dialog()
+
         self.page.app = self
 
         def on_window_event(e):
@@ -104,3 +112,81 @@ class PlayBookApp:
     def refresh_current_page(self):
         self.content_area.content = self.pages[self.current_section].build()
         self.page.update()
+
+    def _show_first_run_dialog(self):
+        path_field = ft.TextField(
+            value=str(Path.home() / "Аудиокниги"),
+            label="Folder with audiobooks",
+            hint_text="/home/user/Audiobooks",
+            expand=True,
+        )
+        progress_bar = ft.ProgressBar(width=400, visible=False)
+        progress_text = ft.Text("", size=12)
+
+        def on_scan(e):
+            raw = path_field.value.strip()
+            if not raw:
+                return
+            p = str(Path(raw).expanduser().resolve())
+            cfg = get_config()
+            cfg.library_paths = [p]
+            save_config(cfg)
+            dialog.open = False
+            self.page.update()
+            self._run_first_scan(p, progress_bar, progress_text)
+
+        def on_skip(e):
+            dialog.open = False
+            self.page.update()
+
+        scan_btn = ft.ElevatedButton("Scan", on_click=on_scan)
+        skip_btn = ft.TextButton("Skip", on_click=on_skip)
+
+        dialog = ft.AlertDialog(
+            title=ft.Text("Welcome to PlayBook!"),
+            content=ft.Column(
+                [
+                    ft.Text("Select a folder with audiobooks to get started:"),
+                    path_field,
+                    progress_bar,
+                    progress_text,
+                ],
+                tight=True,
+            ),
+            actions=[scan_btn, skip_btn],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+
+    def _run_first_scan(self, path: str, progress_bar, progress_text):
+        def scan_job():
+            try:
+                total_added = 0
+                for event in scan_and_update_library([Path(path)]):
+                    if event["type"] == "progress":
+                        progress_bar.visible = True
+                        progress_bar.value = event["current"] / event["total"]
+                        progress_text.value = (
+                            f"{event['current']}/{event['total']} – {event['file']}"
+                        )
+                    elif event["type"] == "finished":
+                        total_added = event["added"]
+                    self.page.update()
+                self.pages["library"].refresh_data()
+                self.switch_to_section("library")
+                self.page.show_snack_bar(
+                    ft.SnackBar(
+                        content=ft.Text(f"Added {total_added} audiobooks!")
+                    )
+                )
+            except Exception as ex:
+                self.page.show_snack_bar(
+                    ft.SnackBar(content=ft.Text(f"Scan error: {ex}"))
+                )
+            finally:
+                self.page.update()
+
+        threading.Thread(target=scan_job, daemon=True).start()
