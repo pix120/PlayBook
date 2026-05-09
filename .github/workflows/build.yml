@@ -22,7 +22,7 @@ jobs:
           pip install -r requirements-dev.txt
       - name: Build EXE
         run: |
-          flet pack src/main.py --name PlayBook --icon assets/icon.png --add-data "assets;assets" --add-data "config;config" --onedir --collect-all flet
+          flet pack src/main.py --name PlayBook --icon assets/icon.png --add-data "assets;assets" --add-data "config;config" --onedir
       - name: Archive
         run: Compress-Archive -Path dist/PlayBook/* -DestinationPath playbook-windows-x64.zip
       - name: Upload artifact
@@ -44,7 +44,7 @@ jobs:
           pip install -r requirements-dev.txt
       - name: Build binary with flet pack
         run: |
-          flet pack src/main.py --name playbook --icon assets/icon.png --add-data "assets:assets" --add-data "config:config" --onedir --collect-all flet
+          flet pack src/main.py --name playbook --icon assets/icon.png --add-data "assets:assets" --add-data "config:config" --onedir
       - name: Verify dist
         run: |
           ls -la dist/playbook || echo "ERROR: dist/playbook not found"
