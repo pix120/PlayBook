@@ -17,7 +17,9 @@ class LibraryPage:
         self._filter = None
         self._view_mode = "grid"
 
-        self.filter_buttons = self._create_filter_buttons()
+        self.filter_buttons: list[ft.ElevatedButton] = []
+        self._create_filter_buttons()
+        self._filter_row: ft.Row | None = None
         self.view_toggle_button = ft.IconButton(
             icon=ft.icons.VIEW_LIST,
             tooltip="Toggle view",
@@ -26,8 +28,8 @@ class LibraryPage:
         self.book_container = ft.Container(expand=True)
 
     def build(self) -> ft.Column:
-        self._update_filter_button_styles()
-        filter_row = ft.Row(
+        self._create_filter_buttons()
+        self._filter_row = ft.Row(
             controls=[ft.Text("Status:", weight=ft.FontWeight.BOLD)]
             + self.filter_buttons
             + [self.view_toggle_button],
@@ -36,39 +38,37 @@ class LibraryPage:
         )
         self._render_books()
         return ft.Column(
-            controls=[filter_row, ft.Divider(), self.book_container],
+            controls=[self._filter_row, ft.Divider(), self.book_container],
             expand=True,
         )
 
-    def _update_filter_button_styles(self):
-        filters = [None, BookStatus.NEW, BookStatus.STARTED, BookStatus.FINISHED]
-        for btn, status in zip(self.filter_buttons, filters):
-            selected = self._filter == status
-            btn.bgcolor = ft.colors.PRIMARY if selected else ft.colors.SURFACE
-            btn.color = ft.colors.ON_PRIMARY if selected else ft.colors.ON_SURFACE
-
     def _create_filter_buttons(self):
-        filters = [
+        self.filter_buttons.clear()
+        for label, status in [
             ("All", None),
             ("New", BookStatus.NEW),
             ("Started", BookStatus.STARTED),
             ("Finished", BookStatus.FINISHED),
-        ]
-        buttons = []
-        for label, status in filters:
+        ]:
             selected = self._filter == status
-            btn = ft.ElevatedButton(
-                text=label,
-                on_click=lambda e, s=status: self._set_filter(s),
-                bgcolor=ft.colors.PRIMARY if selected else ft.colors.SURFACE,
-                color=ft.colors.ON_PRIMARY if selected else ft.colors.ON_SURFACE,
+            self.filter_buttons.append(
+                ft.ElevatedButton(
+                    text=label,
+                    on_click=lambda e, s=status: self._set_filter(s),
+                    bgcolor=ft.colors.PRIMARY if selected else ft.colors.SURFACE,
+                    color=ft.colors.ON_PRIMARY if selected else ft.colors.ON_SURFACE,
+                )
             )
-            buttons.append(btn)
-        return buttons
 
     def _set_filter(self, status):
         self._filter = status
-        self._update_filter_button_styles()
+        self._create_filter_buttons()
+        if self._filter_row:
+            self._filter_row.controls = (
+                [ft.Text("Status:", weight=ft.FontWeight.BOLD)]
+                + self.filter_buttons
+                + [self.view_toggle_button]
+            )
         self._render_books()
         self.app.page.update()
 
