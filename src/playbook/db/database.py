@@ -174,6 +174,18 @@ def delete_book(book_id: int) -> bool:
         return cursor.rowcount > 0
 
 
+def get_last_played_book() -> Optional[Book]:
+    """Получить книгу, которая играла последней (с ненулевым прогрессом и не законченную)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM books WHERE last_played IS NOT NULL AND status != ? ORDER BY last_played DESC LIMIT 1",
+            (BookStatus.FINISHED.value,),
+        ).fetchone()
+        if row:
+            return _row_to_book(row)
+        return None
+
+
 def update_progress(book_id: int, progress: float) -> None:
     """
     Обновить только прогресс и время последнего прослушивания.

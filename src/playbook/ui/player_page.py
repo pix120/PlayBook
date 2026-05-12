@@ -48,12 +48,6 @@ class PlayerPage:
             tooltip="Play/Pause",
             on_click=self._on_play_pause,
         )
-        self.stop_button = ft.IconButton(
-            icon=ft.icons.STOP,
-            icon_size=32,
-            tooltip="Stop",
-            on_click=self._on_stop,
-        )
         self.rewind_back_btn = ft.IconButton(
             icon=ft.icons.REPLAY_10,
             icon_size=32,
@@ -184,7 +178,6 @@ class PlayerPage:
                             self.prev_button,
                             self.rewind_back_btn,
                             self.play_button,
-                            self.stop_button,
                             self.rewind_fwd_btn,
                             self.next_button,
                             self.reset_progress_btn,
@@ -396,7 +389,7 @@ class PlayerPage:
             self.audio = None
         self.audio = ft.Audio(
             src=str(current_track_path),
-            autoplay=False,
+            autoplay=True,
             volume=1.0,
             on_loaded=self._on_audio_loaded,
             on_state_changed=self._on_audio_state_changed,
@@ -439,11 +432,9 @@ class PlayerPage:
 
     def _on_audio_loaded(self, e):
         self._set_controls_enabled(True)
-        if self.audio:
-            if self._pending_seek_seconds > 0:
-                self._seek_lock_time = time.time()
-                self.audio.seek(int(self._pending_seek_seconds * 1000))
-            self.audio.play()
+        if self.audio and self._pending_seek_seconds > 0:
+            self._seek_lock_time = time.time()
+            self.audio.seek(int(self._pending_seek_seconds * 1000))
 
     def _on_audio_state_changed(self, e):
         state = e.data
@@ -544,7 +535,6 @@ class PlayerPage:
 
     def _set_controls_enabled(self, enabled: bool):
         self.play_button.disabled = not enabled
-        self.stop_button.disabled = not enabled
         self.rewind_back_btn.disabled = not enabled
         self.rewind_fwd_btn.disabled = not enabled
         self.speed_dropdown.disabled = not enabled

@@ -1,0 +1,22 @@
+[tool.flet]
+product = "PlayBook"
+org = "com.playbook"
+version = "1.1.0"
+description = "Audiobook player"
+copyright = "Copyright (C) 2026"
+
+[tool.flet.linux]
+artifact_name = "playbook"
+
+[tool.flet.windows]
+artifact_name = "playbook"
+
+[tool.flet.android]
+artifact_name = "playbook"
+adaptive_icon_background = "#1976D2"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-v --tb=short"
+testpaths = ["tests"]
+pythonpath = ["src"]

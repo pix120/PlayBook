@@ -8,7 +8,7 @@ import flet as ft
 from .library_page import LibraryPage
 from .player_page import PlayerPage
 from .settings_page import SettingsPage
-from ..db.database import get_all_books
+from ..db.database import get_all_books, get_last_played_book
 from ..config import get_config, save_config
 from ..scanner import scan_and_update_library
 
@@ -74,6 +74,8 @@ class PlayBookApp:
 
         if not get_all_books():
             self._show_first_run_dialog()
+        else:
+            self._restore_last_played_book()
 
         self.page.app = self
 
@@ -112,6 +114,11 @@ class PlayBookApp:
     def refresh_current_page(self):
         self.content_area.content = self.pages[self.current_section].build()
         self.page.update()
+
+    def _restore_last_played_book(self):
+        last_book = get_last_played_book()
+        if last_book is not None:
+            self.pages["player"].load_book(last_book)
 
     def _show_first_run_dialog(self):
         path_field = ft.TextField(
