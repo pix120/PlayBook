@@ -78,6 +78,7 @@ class PlayBookApp:
             self._restore_last_played_book()
 
         self.page.app = self
+        self._saved_window = {"width": 1000, "height": 700, "top": 100, "left": 100}
 
         def on_window_event(e):
             if e.data == "close":
@@ -86,6 +87,24 @@ class PlayBookApp:
                     player._save_progress()
                 if getattr(page, "window", None) is not None:
                     page.window_destroy()
+            elif e.data == "restore":
+                page.window.width = self._saved_window.get("width", 1000)
+                page.window.height = self._saved_window.get("height", 700)
+                top = self._saved_window.get("top")
+                left = self._saved_window.get("left")
+                if top is not None:
+                    page.window.top = top
+                if left is not None:
+                    page.window.left = left
+            elif e.data in ("resize", "move", "minimize"):
+                w = getattr(page.window, "width", None)
+                h = getattr(page.window, "height", None)
+                t = getattr(page.window, "top", None)
+                l = getattr(page.window, "left", None)
+                if w: self._saved_window["width"] = w
+                if h: self._saved_window["height"] = h
+                if t is not None: self._saved_window["top"] = t
+                if l is not None: self._saved_window["left"] = l
 
         # In some runtimes/sessions, page.window may exist while the internal
         # native window handle is still unavailable. Binding can raise there.
