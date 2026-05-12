@@ -1,7 +1,7 @@
 [tool.flet]
 product = "PlayBook"
 org = "com.playbook"
-version = "1.1.0"
+version = "1.2.0"
 description = "Audiobook player"
 copyright = "Copyright (C) 2026"
 
